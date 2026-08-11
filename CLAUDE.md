@@ -3,7 +3,16 @@
 Claude Code 向けの入口。実際の指示は [AGENTS.md](AGENTS.md) にまとまっている（OpenCode など他の AI 環境と共有するため）。
 **ルールを変更するときは AGENTS.md 側を直すこと。** このファイルには Claude Code 固有の事情だけを書く。
 
+OpenCode も [opencode.json](opencode.json) の `instructions` でこのファイルを読む
+（OpenCode は `AGENTS.md` と `CLAUDE.md` の両方がある場合、既定では `AGENTS.md` しか読まないため）。
+どの AI でも同じ内容が届くので、ここに書いたことは全環境に効く。
+
 @AGENTS.md
+
+## 迷ったら
+
+**ゲームの仕様で迷ったら [docs/Spec.txt](docs/Spec.txt) を見る。** 何を作るかの正はここ。
+書かれていないことは勝手に決めずに確認する。書式や進め方の迷いは AGENTS.md 側。
 
 ## Claude Code 固有のメモ
 
