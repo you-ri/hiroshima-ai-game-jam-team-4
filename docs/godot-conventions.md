@@ -172,6 +172,7 @@ move_left={
 
 - ルートは `Node2D`。ステージ寸法は `DESIGN_WIDTH/HEIGHT`(1280x720) 定数で固定する。
   `get_viewport_rect()` は stretch 拡張で**実ウィンドウサイズ**を返すので、ステージ計算に使わない。
-- 地面の上面が世界 `y = 0`（＝高度 0m）。上へ行くほど `y` は負。ゴールは 6 画面分（`SCREEN_COUNT = 6`）。
+- 地面の上面が世界 `y = 0`（＝高度 0m）。上へ行くほど `y` は負。ゴールは高度 3000m ＝ 6 画面分。
+  m ↔ px の換算は `scripts/units.gd`（`Units`、1m = 1.44px）。速度・高度の定数は m 単位で書く。
 - 共有状態（残機・高度・クリア判定）は autoload ではなく `scenes/main.gd` が持つ。
 - 入力アクションは `thrust` / `rotate_left` / `rotate_right`。追加するときは動詞の `snake_case` で揃える。

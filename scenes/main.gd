@@ -1,18 +1,18 @@
 extends Node2D
 ## 縦スクロール・クライマー「アポフィス」（射撃なし）。
 ## 仕様（docs/Spec.txt）:
-## - スタートは 0m。地面の上に立つ。6 画面分（4320m）登って最上部に到達でクリア
+## - スタートは 0m。地面の上に立つ。ゴールは 3000m（= 6 画面分。1m = 1.44px、scripts/units.gd）
 ## - カメラは常にプレイヤーを中心に映す
 ## - W 連打で推進（A/D で旋回、無操作は自然落下）
-## - 残機制 3。下からの岩・上からの隕石に 3 回当たると失敗
+## - 残機制 3。障害物に 3 回当たると失敗
+## - 岩: 画面下方から 0.5s ごと、方向 0〜180 度・速度 100〜150 m/s のランダム
+## - 隕石: 高度 1000m 到達後、画面上方から 0.7s ごと、速度 20〜50 m/s で落下
 ##
 ## 当たり判定は Rocket の Hitbox(Area2D) と障害物(Area2D) の重なりで行う。
 ## 障害物は物理的な押し合いをせず、RigidBody の挙動を汚さない。
 
-const SCREEN_COUNT := 6
-## 設計解像度（project.godot の display/window/size と一致させる）
-const DESIGN_WIDTH := 1280.0
-const DESIGN_HEIGHT := 720.0
+const DESIGN_WIDTH := Units.DESIGN_WIDTH
+const DESIGN_HEIGHT := Units.DESIGN_HEIGHT
 const HALF_STAGE_WIDTH := DESIGN_WIDTH * 0.5
 ## 地面の上面 = 世界 y=0。ロケット中心（半径 30）が接地する高さ
 const GROUND_Y := 0.0
@@ -22,6 +22,11 @@ const WALL_THICKNESS := 24.0
 const START_LIVES := 3
 const INVULN_TIME := 2.0
 
+## Spec: ゴールは 3000m
+const GOAL_ALTITUDE_M := 3000.0
+## Spec: 隕石はプレイヤーが高度 1000m に到達してから生成される
+const METEOR_UNLOCK_ALTITUDE_M := 1000.0
+
 ## 結果画面（クリア／ゲームオーバー）の遷移先
 const GAME_CLEAR_SCENE_PATH := "res://scenes/ui/game_clear.tscn"
 const GAME_OVER_SCENE_PATH := "res://scenes/ui/game_over.tscn"
@@ -29,10 +34,14 @@ const GAME_OVER_SCENE_PATH := "res://scenes/ui/game_over.tscn"
 ## 0 にすると何が起きたか分からないまま画面が変わる
 const RESULT_DELAY := 1.8
 
-const ROCK_SPEED := 130.0
-const METEOR_SPEED := 180.0
-const ROCK_INTERVAL := 1.5
-const METEOR_INTERVAL := 2.0
+## Spec: 岩は 0.5s ごと、速度 100〜150 m/s のランダム
+const ROCK_INTERVAL := 0.5
+const ROCK_SPEED_MIN_MPS := 100.0
+const ROCK_SPEED_MAX_MPS := 150.0
+## Spec: 隕石は 0.7s ごと、速度 20〜50 m/s のランダム
+const METEOR_INTERVAL := 0.7
+const METEOR_SPEED_MIN_MPS := 20.0
+const METEOR_SPEED_MAX_MPS := 50.0
 ## カメラの半高さ（DESIGN_HEIGHT/2）より外側にスポーンさせるための余裕
 const SPAWN_OFFSET := 430.0
 
@@ -47,13 +56,13 @@ const OBSTACLE_SCENE: PackedScene = preload("res://actors/obstacle/obstacle.tscn
 @onready var _alt_bar: Control = $UI/AltitudeBar
 @onready var _alt_fill: ColorRect = $UI/AltitudeBar/Fill
 
-var world_screen_height := DESIGN_HEIGHT
 var world_height := 0.0
 var goal_y := 0.0
 
 var _lives := START_LIVES
 var _cleared := false
 var _game_over := false
+var _meteor_unlocked := false
 var _invuln_timer := 0.0
 var _spawn_timer_rock := 0.0
 var _spawn_timer_meteor := 0.0
@@ -62,7 +71,7 @@ var _obstacles: Node2D
 
 
 func _ready() -> void:
-	world_height = world_screen_height * SCREEN_COUNT
+	world_height = Units.m_to_px(GOAL_ALTITUDE_M)
 	goal_y = GROUND_CENTER_Y - world_height
 
 	_obstacles = Node2D.new()
@@ -71,18 +80,15 @@ func _ready() -> void:
 
 	_build_walls()
 	_build_ground()
-	_background.setup(goal_y, GROUND_Y, HALF_STAGE_WIDTH, world_screen_height)
-
-	# カメラは常にプレイヤー中心（縦はクランプしない）。横だけ壁の外を見せない
-	_camera.limit_left = -int(HALF_STAGE_WIDTH)
-	_camera.limit_right = int(HALF_STAGE_WIDTH)
+	_background.setup(goal_y, GROUND_Y, HALF_STAGE_WIDTH, DESIGN_HEIGHT)
 
 	_alt_bar.position = Vector2(DESIGN_WIDTH - 56.0, 40.0)
 	_alt_bar.size = Vector2(32.0, DESIGN_HEIGHT - 80.0)
 
 	_rocket.hit.connect(_on_rocket_hit)
 	_update_lives_label()
-	print("[main] ready height=%.0f goal_y=%.0f lives=%d" % [world_height, goal_y, _lives])
+	print("[main] ready goal=%.0fm (%.0fpx) goal_y=%.0f lives=%d" % [
+			GOAL_ALTITUDE_M, world_height, goal_y, _lives])
 
 
 func _physics_process(delta: float) -> void:
@@ -94,25 +100,36 @@ func _physics_process(delta: float) -> void:
 		if _invuln_timer <= 0.0:
 			_rocket.set_invulnerable(false)
 
-	if _rocket.global_position.y <= goal_y:
+	var altitude := _altitude_m()
+
+	if altitude >= GOAL_ALTITUDE_M:
 		_cleared = true
 		_rocket.controls_enabled = false
 		_rocket.freeze = true
 		_show_message("クリア！")
-		print("[main] CLEARED at y=%.1f" % _rocket.global_position.y)
+		print("[main] CLEARED at %.0fm" % altitude)
 		_go_to_result(GAME_CLEAR_SCENE_PATH)
 		return
+
+	# Spec: 隕石は高度 1000m 到達後に生成開始（一度解禁されたら降りても止まらない）
+	if not _meteor_unlocked and altitude >= METEOR_UNLOCK_ALTITUDE_M:
+		_meteor_unlocked = true
+		_show_message("警告！ 上から隕石が来る", 2.0)
+		print("[main] meteor unlocked at %.0fm" % altitude)
+
 	_spawn_timer_rock -= delta
-	_spawn_timer_meteor -= delta
 	if _spawn_timer_rock <= 0.0:
 		_spawn_timer_rock = ROCK_INTERVAL
 		_spawn_obstacle(false)
-	if _spawn_timer_meteor <= 0.0:
-		_spawn_timer_meteor = METEOR_INTERVAL
-		_spawn_obstacle(true)
+	if _meteor_unlocked:
+		_spawn_timer_meteor -= delta
+		if _spawn_timer_meteor <= 0.0:
+			_spawn_timer_meteor = METEOR_INTERVAL
+			_spawn_obstacle(true)
 
 
 func _process(delta: float) -> void:
+	# Spec: カメラは常にプレイヤーを中心に映す（クランプなし）
 	_camera.global_position = _rocket.global_position
 	_update_hud()
 
@@ -120,6 +137,11 @@ func _process(delta: float) -> void:
 		_message_timer -= delta
 		if _message_timer <= 0.0:
 			_message_label.visible = false
+
+
+## 高度（m）。地面に接地した状態が 0m
+func _altitude_m() -> float:
+	return maxf(Units.px_to_m(GROUND_CENTER_Y - _rocket.global_position.y), 0.0)
 
 
 func _on_rocket_hit() -> void:
@@ -163,21 +185,23 @@ func _respawn_to_start() -> void:
 
 func _spawn_obstacle(meteor: bool) -> void:
 	var obstacle: Obstacle = OBSTACLE_SCENE.instantiate()
-	# global_position はツリーに追加してから設定する（未追加時は意図どおり反映されない）
-	_obstacles.add_child(obstacle)
 
-	var px := _rocket.global_position.x
+	var x := _random_away_from(_rocket.global_position.x)
 	var py := _rocket.global_position.y
-	var x := _random_away_from(px)
 
 	if meteor:
-		obstacle.global_position = Vector2(x, py - SPAWN_OFFSET)
-		obstacle.velocity = Vector2(0.0, METEOR_SPEED)
-		obstacle.set_body_color(Color(0.85, 0.45, 0.2, 1))
+		# Spec: 画面上方の任意の位置から、20〜50 m/s で落下
+		var speed := Units.m_to_px(randf_range(METEOR_SPEED_MIN_MPS, METEOR_SPEED_MAX_MPS))
+		obstacle.setup(true, Vector2(0.0, speed))
 	else:
-		obstacle.global_position = Vector2(x, py + SPAWN_OFFSET)
-		obstacle.velocity = Vector2(0.0, -ROCK_SPEED)
-		obstacle.set_body_color(Color(0.5, 0.52, 0.58, 1))
+		# Spec: 画面下方の任意の位置から、方向 0〜180 度・速度 100〜150 m/s のランダム
+		var speed := Units.m_to_px(randf_range(ROCK_SPEED_MIN_MPS, ROCK_SPEED_MAX_MPS))
+		var angle := deg_to_rad(randf_range(0.0, 180.0))
+		obstacle.setup(false, Vector2(cos(angle), -sin(angle)) * speed)
+
+	# global_position はツリーに追加してから設定する（未追加時は意図どおり反映されない）
+	_obstacles.add_child(obstacle)
+	obstacle.global_position = Vector2(x, py - SPAWN_OFFSET if meteor else py + SPAWN_OFFSET)
 
 
 func _random_away_from(player_x: float) -> float:
@@ -190,9 +214,9 @@ func _random_away_from(player_x: float) -> float:
 
 
 func _update_hud() -> void:
-	var altitude := maxf(GROUND_CENTER_Y - _rocket.global_position.y, 0.0)
-	var fraction := clampf(altitude / world_height, 0.0, 1.0)
-	_altitude_label.text = "高度 %d / %d" % [int(altitude), int(world_height)]
+	var altitude := _altitude_m()
+	var fraction := clampf(altitude / GOAL_ALTITUDE_M, 0.0, 1.0)
+	_altitude_label.text = "高度 %d m / %d m" % [int(altitude), int(GOAL_ALTITUDE_M)]
 
 	var h := _alt_bar.size.y * fraction
 	_alt_fill.position = Vector2(0.0, _alt_bar.size.y - h)
@@ -203,10 +227,10 @@ func _update_lives_label() -> void:
 	_lives_label.text = "残機 %d" % _lives
 
 
-func _show_message(text: String) -> void:
+func _show_message(text: String, duration := 1.2) -> void:
 	_message_label.text = text
 	_message_label.visible = true
-	_message_timer = 1.2 if not (_cleared or _game_over) else 0.0
+	_message_timer = duration if not (_cleared or _game_over) else 0.0
 
 
 func _build_walls() -> void:
@@ -239,10 +263,11 @@ func _build_ground() -> void:
 	var visual := Polygon2D.new()
 	visual.name = "GroundVisual"
 	visual.color = Color(0.25, 0.2, 0.16, 1)
+	# カメラが常にプレイヤー中心のため、接地時に見える範囲（+430px）まで描く
 	visual.polygon = PackedVector2Array([
-		Vector2(-HALF_STAGE_WIDTH, GROUND_Y),
-		Vector2(HALF_STAGE_WIDTH, GROUND_Y),
-		Vector2(HALF_STAGE_WIDTH, GROUND_Y + 300.0),
-		Vector2(-HALF_STAGE_WIDTH, GROUND_Y + 300.0),
+		Vector2(-HALF_STAGE_WIDTH - 720.0, GROUND_Y),
+		Vector2(HALF_STAGE_WIDTH + 720.0, GROUND_Y),
+		Vector2(HALF_STAGE_WIDTH + 720.0, GROUND_Y + 430.0),
+		Vector2(-HALF_STAGE_WIDTH - 720.0, GROUND_Y + 430.0),
 	])
 	add_child(visual)

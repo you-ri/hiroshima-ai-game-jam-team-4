@@ -12,7 +12,8 @@
 - 広島 AI ゲームジャム team 4 の Godot **4.7.1-stable** プロジェクト（Forward+ / GDScript）。
 - リモート: `https://github.com/you-ri/hiroshima-ai-game-jam-team-4`
 - 作っているのは **「アポフィス（Apophis）」— 2D 縦スクロールのロケットクライマー**（射撃なし）。W 連打で噴射、A / D で旋回し、重力に逆らって 6 画面分登り切ればクリア。下から来る岩と上から来る隕石に当たると残機が減り（初期 3）、スタート地点へ戻される。0 で失敗。
-  - **仕様の正は [docs/Spec.txt](docs/Spec.txt)。** 実装がここと食い違っていたら実装のほうが誤り（現在いくつかズレが残っている）。
+  - **仕様の正は [docs/Spec.txt](docs/Spec.txt)。** 実装がここと食い違っていたら実装のほうが誤り。
+  - 仕様の「ゴール 3000m」と「6 画面上部でクリア」は **1m = 1.44px**（`scripts/units.gd` の `Units`）で両立させている。速度・高度の定数は m 単位で持ち、px へは `Units` で変換する。
   - 実装: `scenes/main.gd`（ステージ・カメラ・クリア／被弾判定・障害物スポーン）、`actors/rocket/`（RigidBody2D の物理挙動）、`actors/obstacle/`（岩・隕石。Area2D）、`scenes/ui/`（タイトル・クリア・ゲームオーバー）。
   - `scenes/main.tscn` は本番シーン。ルートは `Node2D`、地面の上面が世界 `y = 0`（高度 0m）で、上へ行くほど `y` は負。
 - **開発 OS は Windows 限定**（Git Bash 前提）。macOS / Linux 向けの分岐は書かない。

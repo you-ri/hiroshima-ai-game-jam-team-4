@@ -2,9 +2,10 @@ extends RigidBody2D
 class_name Rocket
 ## ロケット本体（射撃なし）。
 ## 仕様（docs/Spec.txt）に合わせた挙動:
-## - W を連打: 押すたびに炎が出て前方（機首方向）へ推進力を得る。押しっぱなしは無効
+## - W を連打: 押すたびに炎が出て前方（機首方向）へ 20 m/s の速度を得る。押しっぱなしは無効
 ## - 何も押さなければ重力で自然落下
 ## - A / D: 推力の向き＝機体の向きを左右に回転
+## - 最大速度 100 m/s（m ↔ px の換算は scripts/units.gd）
 ##
 ## 被弾判定は子の Hitbox(Area2D) が障害物(Area2D)と重なったとき `hit` を発火する。
 ## 当たった後の処理（残機・リスポーン）はシーン側（scenes/main.gd）が行う。
@@ -13,9 +14,13 @@ signal hit
 
 ## 旋回角速度（rad/s）。
 const TURN_SPEED := 3.0
-## 連打 1 回で得る推進力（速度変化 px/s）。質量 1、重力 980 に対して 連打 6 回/s で
-## 約 820 px/s の上昇を得る（6 * 300 - 980）。
-const THRUST_IMPULSE := 300.0
+## 連打 1 回で得る速度変化（Spec: 一度の推進は 20 m/s 上がる）
+const THRUST_MPS := 20.0
+## 最大速度（Spec: 100 m/s）。上昇・落下とも _integrate_forces でクランプする
+const MAX_SPEED_MPS := 100.0
+## 重力加速度（m/s²）。Spec に規定が無いためゲームフィール調整値。
+## ホバリングに必要な連打数 ≒ GRAVITY_MPS2 / THRUST_MPS = 2 回/秒
+const GRAVITY_MPS2 := 40.0
 ## 炎が出ている時間（秒）。1 連打ごとにこの時間だけ炎が見える。
 const FLAME_TIME := 0.15
 
@@ -37,6 +42,9 @@ func _ready() -> void:
 	add_to_group("player")
 	_hitbox.area_entered.connect(_on_hitbox_area_entered)
 	_set_flame(false)
+	# プロジェクト既定の重力（980 px/s²）を Spec のスケール（m/s²）に合わせて縮める
+	var default_gravity := float(ProjectSettings.get_setting("physics/2d/default_gravity"))
+	gravity_scale = Units.m_to_px(GRAVITY_MPS2) / default_gravity
 
 
 func _physics_process(delta: float) -> void:
@@ -49,10 +57,15 @@ func _physics_process(delta: float) -> void:
 
 	if Input.is_action_just_pressed("thrust"):
 		var forward := Vector2.UP.rotated(rotation)
-		apply_central_impulse(forward * THRUST_IMPULSE)
+		apply_central_impulse(forward * Units.m_to_px(THRUST_MPS) * mass)
 		_flame_timer = FLAME_TIME
 
 	_flicker += delta
+
+
+func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
+	# Spec: 最大速度 100 m/s（上昇も落下もクランプ）
+	state.linear_velocity = state.linear_velocity.limit_length(Units.m_to_px(MAX_SPEED_MPS))
 
 
 func _process(delta: float) -> void:
