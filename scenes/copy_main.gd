@@ -15,10 +15,8 @@ extends "res://scenes/main.gd"
 ##
 ## 速度は本編と差し替え: 岩 100〜130 m/s、隕石 30〜70 m/s（_spawn_obstacle を上書き）
 ##
-## 結果表示はシーン遷移せず、このシーン内でスコア内訳を出し続ける
-## （クリア／ゲームオーバーどちらも）。SPACE でリトライ、ESC でタイトルへ。
-
-const TITLE_SCENE_PATH := "res://scenes/ui/title.tscn"
+## 決着時はスコアを確定して ScoreBoard に保存し、余韻の間だけ内訳を出してから
+## 本体（main.gd）と同じく結果画面（game_clear / game_over）へ遷移する。
 
 const ESCAPE_POD_SCENE: PackedScene = preload("res://actors/escape_pod/escape_pod.tscn")
 
@@ -39,7 +37,6 @@ const SCORE_SPECIAL := 500
 #const METEOR_SPEED_MAX_MPS := 70.0
 
 const AURA_COLOR := Color(1.0, 0.85, 0.4, 1.0)
-const RESULT_INPUT_DELAY := 0.8
 
 @onready var _score_label: Label = $UI/Score
 @onready var _breakdown_label: Label = $UI/Breakdown
@@ -57,9 +54,6 @@ var _special_count := 0
 var _play_elapsed := 0.0
 var _item_spawn_timer := 0.0
 var _power_invuln_timer := 0.0
-
-var _result_held := false
-var _result_input_delay := 0.0
 
 var _items: Node2D
 
@@ -93,34 +87,12 @@ func _physics_process(delta: float) -> void:
 			_end_power_invuln()
 
 
-func _process(delta: float) -> void:
-	super(delta)
-	if not _result_held:
-		return
-	_result_input_delay -= delta
-	if _result_input_delay > 0.0:
-		return
-	if Input.is_action_just_pressed("ui_accept"):
-		_replay()
-	elif Input.is_action_just_pressed("ui_cancel"):
-		_back_to_title()
-
-
-## 結果画面へ遷移せず、このシーンでスコア内訳を出し続ける
+## スコアを確定して ScoreBoard に保存し、余韻の間だけ内訳を見せてから
+## 本体と同じ遷移（RESULT_DELAY 後に結果画面へ）を行う
 func _go_to_result(path: String) -> void:
 	_finalize_score()
 	_show_breakdown()
-	_result_held = true
-	_result_input_delay = RESULT_INPUT_DELAY
-
-
-func _replay() -> void:
-	ScoreBoard.store(0, 0, 0, 0, 0, false)
-	get_tree().reload_current_scene()
-
-
-func _back_to_title() -> void:
-	get_tree().change_scene_to_file(TITLE_SCENE_PATH)
+	super(path)
 
 
 ## Spec: 5 秒ごとにプレイヤー上空 300m のランダムな X 位置に 1 個。10% 判定で金色
@@ -214,15 +186,14 @@ func _finalize_score() -> void:
 			_score_total, _score_time, _score_lives, _score_items, _score_special, _cleared])
 
 
-## クリア／ゲームオーバー後にスコア内訳を中央に出し続ける
+## 結果画面へ切り替わるまでの余韻の間、スコア内訳を中央に出す
 func _show_breakdown() -> void:
-	_breakdown_label.text = ("クリア！ タイム %.1f 秒\n" if _cleared else "失敗…\n") \
+	_breakdown_label.text = ("クリア！ タイム %.1f 秒\n" % _play_elapsed if _cleared else "失敗…\n") \
 			+ "タイム  %d 点\n" % _score_time \
 			+ "残機    %d 点\n" % _score_lives \
 			+ "アイテム %d 点\n" % _score_items \
 			+ "特殊アクション %d 点\n" % _score_special \
-			+ "合計    %d 点\n\n" % _score_total \
-			+ "SPACE: もう一度    ESC: タイトルへ"
+			+ "合計    %d 点" % _score_total
 	_breakdown_label.visible = true
 
 
