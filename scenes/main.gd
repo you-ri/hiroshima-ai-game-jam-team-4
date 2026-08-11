@@ -262,7 +262,9 @@ func _build_ground() -> void:
 
 	var visual := Polygon2D.new()
 	visual.name = "GroundVisual"
-	visual.color = Color(0.25, 0.2, 0.16, 1)
+	# 夜景に合わせた暗い地面。背景（山・街 z=-10）より手前、ロケット（z=0）より奥
+	visual.color = Color(0.16, 0.13, 0.11, 1)
+	visual.z_index = -5
 	# カメラが常にプレイヤー中心のため、接地時に見える範囲（+430px）まで描く
 	visual.polygon = PackedVector2Array([
 		Vector2(-HALF_STAGE_WIDTH - 720.0, GROUND_Y),
