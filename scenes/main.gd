@@ -46,6 +46,13 @@ const METEOR_SPEED_MAX_MPS := 50.0
 const SPAWN_OFFSET := 430.0
 
 const OBSTACLE_SCENE: PackedScene = preload("res://actors/obstacle/obstacle.tscn")
+const EXPLOSION_SCENE: PackedScene = preload("res://actors/explosion/explosion.tscn")
+
+## 爆発してからスタート地点に再出撃するまでの時間（秒）
+const RESPAWN_DELAY := 1.0
+## 被弾時のカメラシェイクの強さ（px）と減衰（px/s）
+const SHAKE_STRENGTH := 14.0
+const SHAKE_DECAY := 30.0
 
 @onready var _rocket: Rocket = $Rocket
 @onready var _camera: Camera2D = $Camera2D
@@ -67,6 +74,7 @@ var _invuln_timer := 0.0
 var _spawn_timer_rock := 0.0
 var _spawn_timer_meteor := 0.0
 var _message_timer := 0.0
+var _shake := 0.0
 var _obstacles: Node2D
 
 
@@ -129,8 +137,12 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
-	# Spec: カメラは常にプレイヤーを中心に映す（クランプなし）
-	_camera.global_position = _rocket.global_position
+	# Spec: カメラは常にプレイヤーを中心に映す（クランプなし）。爆発中はシェイクを乗せる
+	var offset := Vector2.ZERO
+	if _shake > 0.0:
+		offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake
+		_shake = maxf(_shake - SHAKE_DECAY * delta, 0.0)
+	_camera.global_position = _rocket.global_position + offset
 	_update_hud()
 
 	if _message_timer > 0.0:
@@ -150,20 +162,42 @@ func _on_rocket_hit() -> void:
 	_lives -= 1
 	_update_lives_label()
 	print("[main] HIT lives=%d" % _lives)
+
+	# ドッカーン。機体は爆発して消える
+	_spawn_explosion.call_deferred(_rocket.global_position)
+	_shake = SHAKE_STRENGTH
+	_rocket.visible = false
+	_rocket.controls_enabled = false
+	# 爆発中に再被弾しないよう当たり判定を切る（無敵タイマーはリスポーン時に開始）
+	_rocket.set_invulnerable(true)
+	# area_entered のフラッシュ中は body mode を変えられないため deferred にする
+	_rocket.set_deferred("freeze", true)
+
 	if _lives <= 0:
 		_game_over = true
-		_rocket.controls_enabled = false
-		# area_entered のフラッシュ中は body mode を変えられないため deferred にする
-		_rocket.set_deferred("freeze", true)
 		_show_message("失敗…残機なし")
 		print("[main] GAME OVER")
 		_go_to_result(GAME_OVER_SCENE_PATH)
 		return
-	# リスポーンもフラッシュ中に走るので deferred で実行する
-	_respawn_to_start.call_deferred()
-	_rocket.set_invulnerable(true)
-	_invuln_timer = INVULN_TIME
+	_respawn_after_explosion()
+
+
+## 爆発の余韻を置いてからスタート地点に再出撃する
+func _respawn_after_explosion() -> void:
+	await get_tree().create_timer(RESPAWN_DELAY).timeout
+	if _cleared or _game_over or not is_inside_tree():
+		return
+	_respawn_to_start()
+	_rocket.visible = true
+	_rocket.controls_enabled = true
+	_invuln_timer = INVULN_TIME  # ここから 2 秒の無敵（点滅）
 	_show_message("スタートへ戻った")
+
+
+func _spawn_explosion(pos: Vector2) -> void:
+	var explosion: Explosion = EXPLOSION_SCENE.instantiate()
+	add_child(explosion)
+	explosion.global_position = pos
 
 
 ## 結果画面へ切り替える。余韻を挟んでから遷移する。
