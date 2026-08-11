@@ -1,9 +1,16 @@
 extends Control
-## タイトル背景。星・地球・接近する小惑星 Apophis を図形描画だけで組む。
+## タイトル／ゲームオーバーの共通背景。星・地球・接近する小惑星 Apophis を図形描画だけで組む。
 ##
 ## 画像アセットをまだ持たないので、すべて _draw() の手描きで作る。
 ## 乱数は固定シードなので、実行のたびに星の並びが変わることはない。
 ## 座標はすべて size（＝ビューポート基準サイズ）に対する比率で持つ。
+##
+## `earth_destroyed` を立てると地球だけが砕けた姿に変わる。星・星雲・小惑星は
+## 同じシードから作るので位置が完全に一致し、タイトルと同じレイアウトのまま
+## 地球の状態だけが変わって見える。
+
+## 地球を破壊された状態で描くか。タイトル画面は false、ゲームオーバー画面は true。
+@export var earth_destroyed := false
 
 ## 星の数。増やしても見た目はあまり変わらず _draw のコストだけ上がる
 const STAR_COUNT := 240
@@ -14,6 +21,9 @@ const METEOR_COUNT := 5
 const METEOR_CYCLE := 3.6
 ## 小惑星の輪郭を作る頂点数
 const ROCK_VERTS := 13
+## 破壊された地球の亀裂の本数と、飛び散る破片の数
+const FISSURE_COUNT := 8
+const CHUNK_COUNT := 10
 
 const COLOR_STAR := Color(0.86, 0.91, 1.0)
 const COLOR_EARTH_BODY := Color(0.04, 0.07, 0.13)
@@ -21,21 +31,28 @@ const COLOR_EARTH_LIMB := Color(0.29, 0.62, 0.92)
 const COLOR_ROCK := Color(0.15, 0.13, 0.14)
 const COLOR_ROCK_EDGE := Color(0.55, 0.42, 0.33)
 const COLOR_HEAT := Color(1.0, 0.5, 0.16)
+const COLOR_EARTH_DEAD := Color(0.06, 0.045, 0.05)
+const COLOR_MAGMA := Color(1.0, 0.36, 0.10)
 
 var _stars: Array[Dictionary] = []
 var _meteors: Array[Dictionary] = []
 var _rock: PackedVector2Array = PackedVector2Array()
 var _craters: Array[Dictionary] = []
+var _fissures: Array[PackedVector2Array] = []
+var _chunks: Array[Dictionary] = []
 var _time := 0.0
 
 
 func _ready() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = RNG_SEED
+	# 生成順を変えると乱数の消費がずれて星の配置まで変わる。末尾に足すこと
 	_build_stars(rng)
 	_build_meteors(rng)
 	_build_rock(rng)
-	print("[backdrop] stars=%d meteors=%d rock_verts=%d" % [_stars.size(), _meteors.size(), _rock.size()])
+	_build_debris(rng)
+	print("[backdrop] stars=%d meteors=%d rock_verts=%d destroyed=%s fissures=%d chunks=%d" % [
+		_stars.size(), _meteors.size(), _rock.size(), earth_destroyed, _fissures.size(), _chunks.size()])
 
 
 func _process(delta: float) -> void:
@@ -95,6 +112,37 @@ func _build_rock(rng: RandomNumberGenerator) -> void:
 		})
 
 
+## 破壊された地球用の亀裂と破片。earth_destroyed が false でも作る
+## （生成しないと乱数の消費が変わり、星の配置がタイトルとずれる）
+func _build_debris(rng: RandomNumberGenerator) -> void:
+	for i in FISSURE_COUNT:
+		# 中心付近から縁へ向かってギザギザに伸びる線。半径 1.0 を地球の縁とする
+		var base := rng.randf_range(0.0, TAU)
+		var pts := PackedVector2Array()
+		for s in 7:
+			var t := float(s) / 6.0
+			var a := base + rng.randf_range(-0.16, 0.16)
+			pts.append(Vector2(cos(a), sin(a)) * lerpf(0.06, 1.0, t))
+		_fissures.append(pts)
+	for i in CHUNK_COUNT:
+		var angle := rng.randf_range(0.0, TAU)
+		var verts := rng.randi_range(3, 5)
+		# 大きいと宇宙に浮いた板に見え、遠いと画面中央の文字に重なる。縁の近くに小さく散らす
+		var scale := rng.randf_range(0.022, 0.062)
+		var poly := PackedVector2Array()
+		for k in verts:
+			var a := TAU * float(k) / float(verts)
+			poly.append(Vector2(cos(a), sin(a)) * scale * rng.randf_range(0.55, 1.0))
+		_chunks.append({
+			"poly": poly,
+			"angle": angle,
+			"dist": rng.randf_range(1.02, 1.22),
+			"spin": rng.randf_range(-0.7, 0.7),
+			"bob": rng.randf_range(0.012, 0.05),
+			"phase": rng.randf_range(0.0, TAU),
+		})
+
+
 # --- 描画 ---------------------------------------------------------------
 
 func _draw_nebula(w: float, h: float) -> void:
@@ -132,6 +180,9 @@ func _draw_stars(w: float, h: float) -> void:
 func _draw_earth(w: float, h: float) -> void:
 	var center := Vector2(w * 0.14, h * 1.22)
 	var radius := h * 0.66
+	if earth_destroyed:
+		_draw_earth_destroyed(center, radius, h)
+		return
 	# 大気の輝き。外側へ薄くなる輪を細かく重ねて、縞に見えないようにする
 	for i in 22:
 		var t := float(i) / 22.0
@@ -153,6 +204,56 @@ func _draw_earth(w: float, h: float) -> void:
 	# 太陽に照らされた縁（右上側）。角度は画面座標なので y は下向き
 	draw_arc(center, radius - 2.0, -2.35, 0.25, 128, COLOR_EARTH_LIMB, 5.0, true)
 	draw_arc(center, radius - 9.0, -2.10, 0.05, 128, Color(0.45, 0.78, 1.0, 0.45), 2.5, true)
+
+
+## 砕けた地球。位置と半径は健在なときと同じで、状態だけが違う
+func _draw_earth_destroyed(center: Vector2, radius: float, h: float) -> void:
+	# 脈打つ余熱。青い大気の代わりに赤熱した輪を出す
+	var pulse: float = 0.85 + 0.15 * sin(_time * 1.6)
+	for i in 22:
+		var t := float(i) / 22.0
+		var col := COLOR_MAGMA
+		col.a = 0.055 * (1.0 - t) * pulse
+		draw_arc(center, radius + t * h * 0.13, 0.0, TAU, 96, col, 4.0, true)
+	draw_circle(center, radius, COLOR_EARTH_DEAD)
+
+	# 亀裂。太く暗い線の上に細く明るい線を重ねて、光っている溝に見せる
+	for f in _fissures:
+		var outer := PackedVector2Array()
+		var inner := PackedVector2Array()
+		for v in f:
+			outer.append(center + v * radius)
+			inner.append(center + v * radius)
+		draw_polyline(outer, Color(0.5, 0.15, 0.04, 0.55), 9.0, true)
+		draw_polyline(inner, Color(COLOR_MAGMA.r, COLOR_MAGMA.g, COLOR_MAGMA.b, 0.9 * pulse), 3.0, true)
+
+	# Apophis が当たった跡。小惑星が来る右上側に開いた穴。
+	# 少ない枚数を濃く重ねると同心円の縞（的のような輪）になるので、薄く細かく重ねる
+	var impact := center + Vector2(0.62, -0.58).normalized() * radius * 0.66
+	var core := radius * 0.10
+	for i in 20:
+		var t := float(i) / 20.0
+		var col := COLOR_MAGMA
+		col.a = 0.035 * (1.0 - t) * pulse
+		draw_circle(impact, core * (1.0 + t * 3.0), col)
+	draw_circle(impact, core * 0.55, Color(1.0, 0.72, 0.32, 0.9 * pulse))
+
+	# 死んだ星の縁。健在なときの青い大気の位置に、鈍い残光だけを残す
+	draw_arc(center, radius - 2.0, -2.35, 0.25, 128, Color(0.52, 0.20, 0.11, 0.5), 3.0, true)
+
+	# 飛び散った破片。ゆっくり外へ漂わせる
+	for c in _chunks:
+		var angle: float = float(c["angle"])
+		var dist: float = float(c["dist"]) + float(c["bob"]) * sin(_time * 0.5 + float(c["phase"]))
+		var at := center + Vector2(cos(angle), sin(angle)) * radius * dist
+		var spin := _time * float(c["spin"])
+		var poly := PackedVector2Array()
+		for v in PackedVector2Array(c["poly"]):
+			poly.append(at + v.rotated(spin) * radius)
+		draw_colored_polygon(poly, COLOR_ROCK)
+		var outline := poly.duplicate()
+		outline.append(poly[0])
+		draw_polyline(outline, Color(0.62, 0.30, 0.16, 0.8), 1.5, true)
 
 
 func _draw_meteors(w: float, h: float) -> void:
