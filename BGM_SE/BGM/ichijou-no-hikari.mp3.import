@@ -12,7 +12,7 @@ dest_files=["res://.godot/imported/ichijou-no-hikari.mp3-18d2cd280d1874e63bfe7ae
 
 [params]
 
-loop=false
+loop=true
 loop_offset=0
 bpm=0
 beat_count=0

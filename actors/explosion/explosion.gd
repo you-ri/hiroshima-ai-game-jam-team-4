@@ -10,6 +10,8 @@ const FLASH_TIME := 0.18
 ## 全エフェクトが終わって自壊するまでの時間（秒）
 const CLEANUP_TIME := 2.0
 
+@onready var _boom: AudioStreamPlayer = $Boom
+
 var _flash_t := 0.0
 
 
@@ -27,6 +29,9 @@ func _ready() -> void:
 		Color(0.35, 0.33, 0.3, 0.6), Color(0.2, 0.2, 0.2, 0.0)], Vector2(0.0, -70.0))
 
 	await get_tree().create_timer(CLEANUP_TIME).timeout
+	# 見た目より爆発音のほうが長い。鳴り終わるまで自壊を待つ（消すと音も切れる）
+	if _boom.playing:
+		await _boom.finished
 	queue_free()
 
 
