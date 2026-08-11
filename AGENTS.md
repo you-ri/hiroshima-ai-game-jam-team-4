@@ -24,7 +24,6 @@
 5. **エディタを開いたまま `.tscn` を書き換えない。** 開いているシーンはエディタ側のメモリが正で、保存時にディスクの変更を潰す。
 6. **`.godot/` は生成物。** 触らない・コミットしない。壊れたら削除して `tools/godot.sh import` で作り直す。
 7. **`.tscn` は同時編集で壊れやすい。** 1 シーン 1 担当。他人のシーンを勝手に作り替えない（[docs/team-rules.md](docs/team-rules.md)）。
-8. **決めたことは残す。** 構成・命名・仕様の判断は [docs/decisions.md](docs/decisions.md) に 1 行足す。次に来る別メンバーの AI はそこしか読めない。
 
 ## 3. 基本ループ
 
@@ -92,7 +91,6 @@ docs/       このドキュメント群
 | [docs/godot-conventions.md](docs/godot-conventions.md) | ディレクトリ / 命名 / `.tscn`・`project.godot` の手書き書式 / よく踏む罠 |
 | [docs/team-rules.md](docs/team-rules.md) | 複数人・複数 AI 環境での分担、ブランチ運用、コンフリクト回避 |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | 症状から引く対処表 |
-| [docs/decisions.md](docs/decisions.md) | 決定ログ（構成・仕様の判断を追記していく） |
 
 ## 8. AI 環境ごとの補足
 

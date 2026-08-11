@@ -44,11 +44,9 @@ Godot の GUI ビルドは PowerShell から出力を捕捉できないため、
 | [docs/godot-conventions.md](docs/godot-conventions.md) | ディレクトリ / 命名 / `.tscn` 手書き書式 / 罠 |
 | [docs/team-rules.md](docs/team-rules.md) | 分担・ブランチ運用・コンフリクト回避 |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | 症状から引く対処表 |
-| [docs/decisions.md](docs/decisions.md) | 決定ログ |
 
 ## 開発の原則
 
 1. **「読み込めた」を「動いた」と混同しない。** Godot は壊れたシーンを黙って読み込む。`check` の先の `verify` まで回す。
 2. **Godot は `tools/godot.sh` 経由で呼ぶ。** 環境差をコードに持ち込まない。
 3. **1 機能 = 1 フォルダ = 1 担当。** `.tscn` の同時編集を避ける。
-4. **決めたことは [docs/decisions.md](docs/decisions.md) に残す。** 他メンバーの AI が読めるのはリポジトリの中身だけ。
