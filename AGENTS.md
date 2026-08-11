@@ -87,6 +87,7 @@ docs/       このドキュメント群
 
 | ファイル | 中身 |
 |---|---|
+| [docs/Spec.txt](docs/Spec.txt) | **ゲーム仕様の唯一の正。** 何を作るかで迷ったらここ。実装がここと違う場合は実装のほうが誤り |
 | [docs/setup.md](docs/setup.md) | 環境構築。Godot の置き場所の登録方法、最初の動作確認 |
 | [docs/workflow.md](docs/workflow.md) | バイブコーディングの回し方。ヘッドレス検証スクリプトの雛形と検証項目 |
 | [docs/godot-conventions.md](docs/godot-conventions.md) | ディレクトリ / 命名 / `.tscn`・`project.godot` の手書き書式 / よく踏む罠 |

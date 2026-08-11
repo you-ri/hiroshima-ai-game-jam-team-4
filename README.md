@@ -39,6 +39,7 @@ Godot の GUI ビルドは PowerShell から出力を捕捉できないため、
 |---|---|
 | [AGENTS.md](AGENTS.md) | **AI エージェントへの指示書（唯一の正）**。ルール変更はここを直す |
 | [CLAUDE.md](CLAUDE.md) | Claude Code の入口。`AGENTS.md` を取り込む薄いファイル |
+| [docs/Spec.txt](docs/Spec.txt) | **ゲーム仕様の唯一の正**。何を作るかはここで決まる |
 | [docs/setup.md](docs/setup.md) | 環境構築・Godot の置き場所の登録 |
 | [docs/workflow.md](docs/workflow.md) | バイブコーディングの回し方とヘッドレス検証 |
 | [docs/godot-conventions.md](docs/godot-conventions.md) | ディレクトリ / 命名 / `.tscn` 手書き書式 / 罠 |
