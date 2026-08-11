@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://5ef2gfmr3mph" path="res://scenes/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://actors/rocket/rocket.tscn" id="2_rocket"]
-[ext_resource type="Script" uid="uid://bb3dsa3f63xfm" path="res://scenes/background.gd" id="3_background"]
+[ext_resource type="PackedScene" path="res://scenes/background.tscn" id="3_background"]
 [ext_resource type="Script" path="res://scenes/launch_pad.gd" id="4_launch_pad"]
 
 [sub_resource type="SystemFont" id="Font_ui"]
@@ -17,9 +17,7 @@ position = Vector2(0, -30)
 
 [node name="Camera2D" type="Camera2D" parent="." unique_id=2028896950]
 
-[node name="Background" type="Node2D" parent="." unique_id=582028447]
-visible = false
-script = ExtResource("3_background")
+[node name="Background" parent="." unique_id=582028447 instance=ExtResource("3_background")]
 
 [node name="LaunchPad" type="Node2D" parent="."]
 script = ExtResource("4_launch_pad")
