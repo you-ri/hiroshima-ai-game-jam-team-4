@@ -52,6 +52,7 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("2_backdrop")
 earth_destroyed = true
+show_asteroid = false
 
 [node name="Layout" type="Control" parent="."]
 layout_mode = 1
