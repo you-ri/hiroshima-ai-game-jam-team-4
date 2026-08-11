@@ -1,7 +1,9 @@
 extends Node2D
-## ステージ背景: 暗黒空間 + 星空 + 地上の夜景（山・街明かり）+ 雲海 + グリッド + 画面区切り線 + 壁 + 大気圏界面（ゴール）。
+## ステージ背景: 暗黒空間 + 星空 + 地上の夜景（山・街明かり）+ 隕石群の落下と着弾爆発 +
+## 各所の火災 + 雲海 + アポフィス + グリッド + 画面区切り線 + 壁 + 大気圏界面（ゴール）。
 ## 純粋な見た目用（Physics に触れない）。stage 範囲は scenes/main.gd が setup() で与える。
 ## カメラが常にプレイヤー中心（クランプなし）のため、壁の外・ゴールの上まで描いておく。
+## 隕石・火災のアニメーションのため毎フレーム全体を再描画する（全て手続き描画なので軽い）。
 
 ## カメラが壁の外／ゴールの上を映しても空白にならないための余白
 const MARGIN_X := 720.0
@@ -63,16 +65,86 @@ const ATMO_HAZE_HEIGHT := 1100.0
 const ATMO_HAZE_BANDS := 10
 const ATMO_HAZE_MAX_ALPHA := 0.1
 
+## 落下する無数の小さな隕石（アポフィスの破片の先触れ）。地面に着弾すると爆発する。
+## ゲームプレイの障害物（actors/obstacle）とは無関係の、当たり判定を持たない演出
+const SHOWER_SEED := 99942
+const SHOWER_COUNT := 90
+const SHOWER_SPEED := Vector2(420.0, 820.0)  # px/s
+## 落下方向の x 成分（全体をやや左流れに揃えると「同じ空から降っている」感が出る）
+const SHOWER_DRIFT := Vector2(0.06, 0.3)
+const SHOWER_LENGTH := Vector2(26.0, 64.0)
+const SHOWER_COLOR := Color(1.0, 0.62, 0.3, 1)
+## 着弾爆発の長さ（秒）と半径の範囲
+const SHOWER_EXPLOSION_TIME := 0.7
+const SHOWER_EXPLOSION_RADIUS := Vector2(26.0, 72.0)
+
+## 雲海の直前の高度を飛ぶ旅客機（一度きりの演出）。カメラが TRIGGER 高度を超えると
+## 右から現れ、数秒飛んだところで被弾して爆発し、火を噴きながら墜落する。当たり判定なし
+const PLANE_TRIGGER_ALTITUDE_M := 760.0
+const PLANE_ALTITUDE_M := 880.0
+## 出現から爆発までの飛行時間（秒）と速度（px/s）
+const PLANE_FLY_TIME := 2.6
+const PLANE_SPEED := 470.0
+const PLANE_EXPLOSION_TIME := 0.6
+## 墜落中も進行方向へ流れる割合と、落下の加速度（px/s²）
+const PLANE_FALL_DRIFT := 0.35
+const PLANE_FALL_ACCEL := 880.0
+const PLANE_GROUND_EXPLOSION_TIME := 0.8
+const PLANE_BODY_COLOR := Color(0.16, 0.17, 0.22, 1)
+## 機体の表示倍率（遠景でも見えるよう少し大きめに描く）
+const PLANE_SCALE := 1.35
+
+## 雲海の上で、左右からアポフィスへ撃ち込まれ続ける弾道ミサイル（人類の抵抗）。
+## 表面で爆発するがアポフィスはびくともしない。ループする環境演出で当たり判定なし
+const MISSILE_SEED := 573
+const MISSILE_COUNT := 7
+## 発射から着弾までの時間（秒）の範囲と、着弾爆発の長さ・半径
+const MISSILE_FLIGHT_TIME := Vector2(2.0, 3.2)
+const MISSILE_EXPLOSION_TIME := 0.55
+const MISSILE_EXPLOSION_RADIUS := Vector2(26.0, 48.0)
+## 次弾までの休止（秒）の範囲（全弾同時発射にならないよう周期をずらす）
+const MISSILE_PAUSE := Vector2(0.4, 1.6)
+
+## 街・山のあちこちで燃える火災（ちらつく光の点。世紀末感の主役）
+const FIRE_SEED := 20290413
+const FIRE_COUNT := 34
+const FIRE_COLOR := Color(1.0, 0.45, 0.12, 1)
+const FIRE_CORE_COLOR := Color(1.0, 0.85, 0.45, 1)
+## 地平線全体を赤く染める「世界が燃えている」光
+const FIRE_HORIZON_COLOR := Color(0.85, 0.18, 0.05, 1)
+
 var _top_y := 0.0
 var _bottom_y := 0.0
 var _half_width := 640.0
 var _screen_sep := 720.0
 var _grid_step := 64.0
+## アニメーション用の経過時間（隕石の落下位相・火災のちらつきに使う）
+var _t := 0.0
+## 旅客機の演出。カメラが所定高度を超えたら開始し、以後 _plane_t を進める
+var _plane_started := false
+var _plane_t := 0.0
+## 被弾させる x 座標。開始時のカメラ中央を記録し、プレイヤーの目の前で爆発させる
+var _plane_boom_x := 0.0
 
 
 func _ready() -> void:
 	# main.tscn のツリー順では Rocket より後ろ（＝手前）に来るため、必ず奥に描く
 	z_index = -10
+
+
+func _process(delta: float) -> void:
+	_t += delta
+	if _plane_started:
+		_plane_t += delta
+	else:
+		# プレイヤー（＝カメラ）が雲海の少し下まで登ってきたら旅客機の演出を始める
+		var camera := get_viewport().get_camera_2d()
+		if camera != null \
+				and camera.global_position.y <= -Units.m_to_px(PLANE_TRIGGER_ALTITUDE_M):
+			_plane_started = true
+			# 画面の真ん中あたりで被弾するよう、この時点のカメラ中央 x を狙い点にする
+			_plane_boom_x = camera.global_position.x
+	queue_redraw()
 
 
 func setup(top_y: float, bottom_y: float, half_width: float, screen_sep: float) -> void:
@@ -116,8 +188,20 @@ func _draw() -> void:
 	# 地上の夜景（遠景の山 → 街明かり → 近景の山の順で奥から重ねる）
 	_draw_night_scenery(rng, left, right)
 
+	# 各所の火災（山・ビルの上に乗せてちらつかせる）
+	_draw_fires(left, right)
+
 	# アポフィス（雲海より奥＝先に描く。下から登る間は雲海が幕になって見えない）
 	_draw_apophis(rng)
+
+	# アポフィスへ撃ち込まれる弾道ミサイル（アポフィスの手前）
+	_draw_missiles()
+
+	# 落下する隕石群（山・街・アポフィスより手前、雲海より奥）
+	_draw_meteor_shower(left, right, top)
+
+	# 旅客機の被弾・墜落（隕石群と同じレイヤー感。雲海より奥）
+	_draw_plane()
 
 	# 雲海（ステージ中腹。夜景より手前・壁より奥）
 	_draw_cloud_sea(rng, left, right)
@@ -183,6 +267,209 @@ func _draw_cloud_sea(rng: RandomNumberGenerator, left: float, right: float) -> v
 			var r := rng.randf_range(radius.x, radius.y)
 			draw_circle(Vector2(x, base_y + rng.randf_range(-spread, spread)), r, color)
 			x += rng.randf_range(step.x, step.y)
+
+
+## 落下する無数の小さな隕石。各隕石は「空から落ちる → 地面（y=0）で爆発 → 再落下」を
+## 独自の周期でループする。パラメータは固定シードで決定的、位相だけ _t で進める
+func _draw_meteor_shower(left: float, right: float, top: float) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SHOWER_SEED
+	for _i in SHOWER_COUNT:
+		var start := Vector2(rng.randf_range(left, right), rng.randf_range(top, -250.0))
+		var speed := rng.randf_range(SHOWER_SPEED.x, SHOWER_SPEED.y)
+		var dir := Vector2(-rng.randf_range(SHOWER_DRIFT.x, SHOWER_DRIFT.y), 1.0).normalized()
+		var length := rng.randf_range(SHOWER_LENGTH.x, SHOWER_LENGTH.y)
+		var alpha := rng.randf_range(0.25, 0.6)
+		var boom_r := rng.randf_range(SHOWER_EXPLOSION_RADIUS.x, SHOWER_EXPLOSION_RADIUS.y)
+
+		# 開始位置から地面（y=0）までの落下時間 + 爆発時間で 1 周期
+		var fall_time := (0.0 - start.y) / dir.y / speed
+		var cycle := fall_time + SHOWER_EXPLOSION_TIME
+		var phase := fposmod(_t + rng.randf_range(0.0, cycle), cycle)
+
+		if phase < fall_time:
+			# 落下中: 尾を引く光の筋（先端ほど明るい 2 重線）
+			var pos := start + dir * speed * phase
+			var tail := pos - dir * length
+			draw_line(tail, pos,
+					Color(SHOWER_COLOR.r, SHOWER_COLOR.g, SHOWER_COLOR.b, alpha * 0.4), 1.5)
+			draw_line(pos - dir * length * 0.35, pos,
+					Color(1.0, 0.85, 0.55, alpha), 2.5)
+		else:
+			# 着弾: 広がって消える爆発
+			var e := (phase - fall_time) / SHOWER_EXPLOSION_TIME
+			var impact := start + dir * speed * fall_time + Vector2(0.0, -4.0)
+			_draw_explosion(impact, e, boom_r)
+
+
+## 広がって消える爆発（グロー → 芯 → 衝撃波の輪）。e は進行度 0〜1
+func _draw_explosion(center: Vector2, e: float, radius: float) -> void:
+	var grow := 1.0 - (1.0 - e) * (1.0 - e)
+	draw_circle(center, radius * grow, Color(1.0, 0.45, 0.12, 0.4 * (1.0 - e)))
+	draw_circle(center, radius * grow * 0.5, Color(1.0, 0.85, 0.5, 0.7 * (1.0 - e)))
+	draw_arc(center, radius * (0.4 + grow * 1.6), 0.0, TAU, 28,
+			Color(1.0, 0.7, 0.4, 0.5 * (1.0 - e)), 2.0)
+
+
+## 左右の画面外からアポフィスへ向かう弾道ミサイル。2 次ベジェで緩い弧を描いて飛び、
+## 表面で爆発して消える（アポフィスは無傷のまま＝人類の攻撃が通じない絵）。
+## 各弾のパラメータは固定シードで決定的、位相だけ _t で進める
+func _draw_missiles() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = MISSILE_SEED
+	var apo := Vector2(APOPHIS_CENTER_X, -Units.m_to_px(APOPHIS_ALTITUDE_M))
+	for i in MISSILE_COUNT:
+		var side := -1.0 if i % 2 == 0 else 1.0
+		# 発射点は雲海の高さの画面外。撃った側の面（左弾なら左面）に当てる
+		var from := Vector2(side * (_half_width + 80.0),
+				-Units.m_to_px(rng.randf_range(1100.0, 1350.0)))
+		var hit_angle := (PI if side < 0.0 else 0.0) + rng.randf_range(-0.5, 0.5)
+		var to := apo + Vector2(cos(hit_angle), sin(hit_angle)) * APOPHIS_RADIUS * 0.98
+		# 中間制御点を外側・上方に置いて弾道らしい弧にする
+		var mid := (from + to) * 0.5 \
+				+ Vector2(side * rng.randf_range(60.0, 160.0), -rng.randf_range(120.0, 260.0))
+		var flight := rng.randf_range(MISSILE_FLIGHT_TIME.x, MISSILE_FLIGHT_TIME.y)
+		var boom_r := rng.randf_range(MISSILE_EXPLOSION_RADIUS.x, MISSILE_EXPLOSION_RADIUS.y)
+		var cycle := flight + MISSILE_EXPLOSION_TIME \
+				+ rng.randf_range(MISSILE_PAUSE.x, MISSILE_PAUSE.y)
+		var phase := fposmod(_t + rng.randf_range(0.0, cycle), cycle)
+
+		if phase < flight:
+			var u := phase / flight
+			var pos := from.lerp(mid, u).lerp(mid.lerp(to, u), u)
+			var tangent := (mid - from).lerp(to - mid, u).normalized()
+			# 排気炎（2 つ）と煙（2 つ）の尾
+			for j in 4:
+				var color := Color(1.0, 0.6, 0.2, 0.55 - j * 0.12) if j < 2 \
+						else Color(0.5, 0.5, 0.55, 0.3 - (j - 2) * 0.1)
+				draw_circle(pos - tangent * (9.0 + j * 12.0), 3.0 + j * 1.5, color)
+			# 弾体と先端の光点
+			draw_line(pos - tangent * 8.0, pos + tangent * 4.0,
+					Color(0.85, 0.88, 0.95, 0.9), 3.0)
+			draw_circle(pos + tangent * 4.0, 2.0, Color(1.0, 0.95, 0.8, 0.95))
+		elif phase < flight + MISSILE_EXPLOSION_TIME:
+			# 着弾。爆発だけしてアポフィスは無傷（描き換えない）
+			_draw_explosion(to, (phase - flight) / MISSILE_EXPLOSION_TIME, boom_r)
+
+
+## 旅客機の演出。飛行（2〜3 秒）→ 空中爆発 → 火を噴いて墜落 → 地面で爆発 →
+## 墜落地点が燃え続ける、を _plane_t だけで手続き的に描く（状態変数を増やさない）
+func _draw_plane() -> void:
+	if not _plane_started:
+		return
+	var cruise_y := -Units.m_to_px(PLANE_ALTITUDE_M)
+	# 爆発地点（開始時のカメラ中央）から逆算して、画面右外から入ってくる開始位置を決める
+	var start_x := _plane_boom_x + PLANE_SPEED * PLANE_FLY_TIME
+
+	# 飛行中（左向きに巡航。機体は _draw_plane_body）
+	if _plane_t < PLANE_FLY_TIME:
+		_draw_plane_body(Vector2(start_x - PLANE_SPEED * _plane_t, cruise_y), _plane_t)
+		return
+
+	var boom := Vector2(_plane_boom_x, cruise_y)
+	var tf := _plane_t - PLANE_FLY_TIME
+	# 被弾点から地面（y=0）までの落下時間
+	var fall_time := sqrt(2.0 * (0.0 - cruise_y) / PLANE_FALL_ACCEL)
+
+	if tf < fall_time:
+		# 火を噴きながら墜落する残骸（炎 3 つ + 煙 3 つの尾を引く）
+		var pos := boom + Vector2(-PLANE_SPEED * PLANE_FALL_DRIFT * tf,
+				0.5 * PLANE_FALL_ACCEL * tf * tf)
+		var back := -Vector2(-PLANE_SPEED * PLANE_FALL_DRIFT,
+				PLANE_FALL_ACCEL * tf).normalized()
+		for i in 6:
+			var flick := 0.7 + 0.3 * sin(_t * 17.0 + i * 2.1)
+			var color := Color(1.0, 0.5, 0.15, 0.5 * flick) if i < 3 \
+					else Color(0.4, 0.38, 0.36, 0.3)
+			draw_circle(pos + back * (8.0 + i * 16.0), 5.0 + i * 2.5, color)
+		# 回転しながら落ちる機体の破片
+		draw_set_transform(pos, tf * 7.0, Vector2.ONE)
+		draw_rect(Rect2(-16.0, -4.0, 32.0, 8.0), PLANE_BODY_COLOR)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+	# 空中爆発（墜落の始まりと重ねて描く）
+	if tf < PLANE_EXPLOSION_TIME:
+		_draw_explosion(boom, tf / PLANE_EXPLOSION_TIME, 90.0)
+
+	# 地面に到達: 着地爆発 → 以後は墜落地点が燃え続ける（煙の柱つき）
+	if tf >= fall_time:
+		var crash := Vector2(boom.x - PLANE_SPEED * PLANE_FALL_DRIFT * fall_time, -8.0)
+		var tg := tf - fall_time
+		if tg < PLANE_GROUND_EXPLOSION_TIME:
+			_draw_explosion(crash, tg / PLANE_GROUND_EXPLOSION_TIME, 120.0)
+		var flick := 0.72 + 0.28 * sin(_t * 7.0)
+		draw_circle(crash, 40.0, Color(1.0, 0.45, 0.12, 0.1 * flick))
+		draw_circle(crash, 18.0, Color(1.0, 0.45, 0.12, 0.7 * flick))
+		draw_circle(crash + Vector2(0.0, -8.0), 8.0, Color(1.0, 0.85, 0.45, 0.85 * flick))
+		for i in 5:
+			draw_circle(crash + Vector2(sin(_t * 0.9 + i) * 8.0 + i * 4.0,
+					-30.0 - i * 26.0), 10.0 + i * 4.0,
+					Color(0.25, 0.23, 0.22, 0.16 - i * 0.02))
+
+
+## 左向きに巡航する旅客機のシルエット。夜なので暗い機体を窓明かりと航法灯で見せる。
+## 座標は機体ローカルで書き、PLANE_SCALE の transform でまとめて拡大する
+func _draw_plane_body(pos: Vector2, t: float) -> void:
+	draw_set_transform(pos, 0.0, Vector2(PLANE_SCALE, PLANE_SCALE))
+
+	# 飛行機雲（後方へ薄く途切れながら伸びる）
+	for i in 5:
+		var d := 34.0 + i * 26.0
+		draw_line(Vector2(d, 2.0), Vector2(d + 20.0, 2.0),
+				Color(0.75, 0.8, 0.88, 0.14 - i * 0.022), 3.0)
+
+	# 胴体（左が機首）と尾翼・主翼
+	draw_line(Vector2(-26.0, 0.0), Vector2(24.0, 0.0), PLANE_BODY_COLOR, 6.0)
+	draw_circle(Vector2(-26.0, 0.0), 3.0, PLANE_BODY_COLOR)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(-2.0, 0.0), Vector2(16.0, 13.0), Vector2(6.0, 0.0),
+	]), PLANE_BODY_COLOR)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(18.0, 0.0), Vector2(28.0, -13.0), Vector2(26.0, 0.0),
+	]), PLANE_BODY_COLOR)
+
+	# 窓明かりの列
+	for i in 6:
+		draw_circle(Vector2(-19.0 + i * 7.0, -1.5), 1.2, Color(1.0, 0.9, 0.6, 0.8))
+
+	# 航法灯（翼端の赤 + 尾部の白ストロボ。実機っぽく別周期で点滅）
+	if fmod(t, 1.0) < 0.55:
+		draw_circle(Vector2(16.0, 13.0), 2.2, Color(1.0, 0.2, 0.15, 0.95))
+	if fmod(t, 0.9) < 0.12:
+		draw_circle(Vector2(28.0, -13.0), 2.6, Color(1.0, 1.0, 1.0, 0.95))
+
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## 山・ビルのあちこちで燃える火災。ちらつく光の点 + 地平線を赤く染める帯。
+## 位置・大きさは固定シードで決定的、明滅だけ _t で揺らす
+func _draw_fires(left: float, right: float) -> void:
+	# 地平線全体の赤い照り返し（矩形を重ねた擬似グラデーション。街明かりの紫の上に赤を足す）
+	for i in 4:
+		var h := 240.0 - i * 52.0
+		draw_rect(Rect2(left, -h, right - left, h),
+				Color(FIRE_HORIZON_COLOR.r, FIRE_HORIZON_COLOR.g, FIRE_HORIZON_COLOR.b, 0.035))
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = FIRE_SEED
+	for _i in FIRE_COUNT:
+		var pos := Vector2(rng.randf_range(left, right), -rng.randf_range(6.0, 220.0))
+		var size := rng.randf_range(6.0, 18.0)
+		var freq := rng.randf_range(5.0, 10.0)
+		var ph := rng.randf_range(0.0, TAU)
+		# ちらつき（大きさと明るさを別位相で揺らすと火っぽくなる）
+		var flicker := 0.72 + 0.28 * sin(_t * freq + ph)
+		var s := size * (0.85 + 0.15 * sin(_t * freq * 1.7 + ph * 2.0))
+
+		draw_circle(pos, s * 3.4, Color(FIRE_COLOR.r, FIRE_COLOR.g, FIRE_COLOR.b,
+				0.07 * flicker))
+		draw_circle(pos, s * 1.7, Color(FIRE_COLOR.r, FIRE_COLOR.g, FIRE_COLOR.b,
+				0.16 * flicker))
+		draw_circle(pos, s, Color(FIRE_COLOR.r, FIRE_COLOR.g, FIRE_COLOR.b,
+				0.8 * flicker))
+		# 芯は少し上に（炎の形の示唆）
+		draw_circle(pos + Vector2(0.0, -s * 0.35), s * 0.45,
+				Color(FIRE_CORE_COLOR.r, FIRE_CORE_COLOR.g, FIRE_CORE_COLOR.b, 0.9 * flicker))
 
 
 ## 雲海の上空に浮かぶ巨大隕石アポフィス。背景の一部なので動かない。
