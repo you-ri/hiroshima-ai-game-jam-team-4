@@ -9,8 +9,10 @@ extends Control
 ## 同じシードから作るので位置が完全に一致し、タイトルと同じレイアウトのまま
 ## 地球の状態だけが変わって見える。
 
-## 地球を破壊された状態で描くか。タイトル画面は false、ゲームオーバー画面は true。
+## 地球を破壊された状態で描くか。タイトル画面は false、ゲームオーバー／クリア画面は true。
 @export var earth_destroyed := false
+## 脱出したロケットを大きく描くか。ゲームクリア画面だけ true。
+@export var show_rocket := false
 
 ## 星の数。増やしても見た目はあまり変わらず _draw のコストだけ上がる
 const STAR_COUNT := 240
@@ -33,6 +35,38 @@ const COLOR_ROCK_EDGE := Color(0.55, 0.42, 0.33)
 const COLOR_HEAT := Color(1.0, 0.5, 0.16)
 const COLOR_EARTH_DEAD := Color(0.06, 0.045, 0.05)
 const COLOR_MAGMA := Color(1.0, 0.36, 0.10)
+
+# ロケットの形と色は本編の actors/rocket/rocket.tscn からそのまま持ってきている。
+# 向こうを描き変えたらここも合わせること（別物に見えると「脱出した機体」に見えない）。
+const ROCKET_BODY_COLOR := Color(0.72, 0.76, 0.82)
+const ROCKET_NOSE_COLOR := Color(0.9, 0.25, 0.2)
+const ROCKET_FLAME_COLOR := Color(1, 0.55, 0.1, 0.9)
+const ROCKET_CORE_COLOR := Color(1, 0.9, 0.5)
+## 炎ポリゴンが機体に付く位置（ローカル y）。ここを軸に伸縮させないと根元に隙間が空く
+const ROCKET_NOZZLE_Y := 46.0
+
+## 機体の輪郭そのもの（actors/rocket/rocket.tscn の Body と同一）。凹形状なので塗りには使わず、
+## 縁取りの線と、本編と一致しているかの検証にだけ使う。
+var _rocket_body := PackedVector2Array([
+	Vector2(0, -56), Vector2(18, -30), Vector2(18, -8), Vector2(30, 20), Vector2(18, 20),
+	Vector2(18, 38), Vector2(0, 44), Vector2(-18, 38), Vector2(-18, 20), Vector2(-30, 20),
+	Vector2(-18, -8), Vector2(-18, -30)])
+# 塗りは上の輪郭を「胴体＋左右のフィン」の凸な 3 つに分けて描く。
+# 凹んだままだと三角形分割の解が一意に決まらず、輪郭からはみ出して太った形になる（実測で確認）。
+# この 3 つの和は _rocket_body と完全に一致する。
+var _rocket_hull := PackedVector2Array([
+	Vector2(0, -56), Vector2(18, -30), Vector2(18, 38), Vector2(0, 44),
+	Vector2(-18, 38), Vector2(-18, -30)])
+var _rocket_fin_right := PackedVector2Array([
+	Vector2(18, -8), Vector2(30, 20), Vector2(18, 20)])
+var _rocket_fin_left := PackedVector2Array([
+	Vector2(-18, -8), Vector2(-30, 20), Vector2(-18, 20)])
+var _rocket_nose := PackedVector2Array([
+	Vector2(0, -56), Vector2(12, -32), Vector2(0, -18), Vector2(-12, -32)])
+var _rocket_flame := PackedVector2Array([
+	Vector2(0, 46), Vector2(12, 62), Vector2(0, 118), Vector2(-12, 62)])
+var _rocket_core := PackedVector2Array([
+	Vector2(0, 46), Vector2(7, 58), Vector2(0, 86), Vector2(-7, 58)])
 
 var _stars: Array[Dictionary] = []
 var _meteors: Array[Dictionary] = []
@@ -68,6 +102,8 @@ func _draw() -> void:
 	_draw_earth(w, h)
 	_draw_meteors(w, h)
 	_draw_apophis(w, h)
+	if show_rocket:
+		_draw_rocket(w, h)
 
 
 # --- 生成 ---------------------------------------------------------------
@@ -254,6 +290,64 @@ func _draw_earth_destroyed(center: Vector2, radius: float, h: float) -> void:
 		var outline := poly.duplicate()
 		outline.append(poly[0])
 		draw_polyline(outline, Color(0.62, 0.30, 0.16, 0.8), 1.5, true)
+
+
+## 脱出したロケット。砕けた地球（左下）に背を向け、右上へ昇っていく姿。
+## 画面右下の空いている領域に置く（中央の文字と右下のクレジットを避ける位置）。
+func _draw_rocket(w: float, h: float) -> void:
+	var at := Vector2(w * 0.79, h * 0.60)
+	# 本編のポリゴンは全長 100 単位。画面高さに対する比率で拡大する
+	var s := h * 0.0042
+	# 傾けすぎると大きく映したときに機体だと分かりにくい。右上へ昇る程度に留める
+	var rot := deg_to_rad(16.0)
+	var flicker: float = 0.80 + 0.14 * sin(_time * 12.0) + 0.06 * sin(_time * 27.0)
+	var back := Vector2(0, 1).rotated(rot)
+
+	# 噴射の余韻。地球の方向へ長く尾を引かせる
+	for i in 14:
+		var t := float(i) / 14.0
+		var col := COLOR_HEAT
+		col.a = 0.05 * (1.0 - t)
+		draw_circle(at + back * s * (70.0 + t * 460.0), s * (28.0 - t * 14.0), col)
+
+	# 機体は底が 1 点に尖っているため、炎をそのまま繋ぐと離れて見える。
+	# 根元を機体側へ少し潜り込ませてから描く（機体を後で上に重ねるので継ぎ目は出ない）
+	var flame_at := at + (Vector2(0, -10) * s).rotated(rot)
+	draw_colored_polygon(_place(_flicker_flame(_rocket_flame, flicker), flame_at, s, rot), ROCKET_FLAME_COLOR)
+	draw_colored_polygon(_place(_flicker_flame(_rocket_core, flicker), flame_at, s, rot), ROCKET_CORE_COLOR)
+
+	# 胴体とフィンを別々に塗る（どれも凸なので分割は一意に決まる）
+	draw_colored_polygon(_place(_rocket_hull, at, s, rot), ROCKET_BODY_COLOR)
+	draw_colored_polygon(_place(_rocket_fin_right, at, s, rot), ROCKET_BODY_COLOR)
+	draw_colored_polygon(_place(_rocket_fin_left, at, s, rot), ROCKET_BODY_COLOR)
+	draw_colored_polygon(_place(_rocket_nose, at, s, rot), ROCKET_NOSE_COLOR)
+
+	# 操縦席の窓。本編の機体（豆粒サイズ）には無いが、大きく映すと単色の板に見えて
+	# ロケットだと分からないため、この画面用の描き込みとして足している
+	var window_at := at + (Vector2(0, -20) * s).rotated(rot)
+	draw_circle(window_at, s * 9.5, Color(0.16, 0.20, 0.26))
+	draw_circle(window_at, s * 7.5, Color(0.45, 0.74, 0.95))
+	draw_circle(window_at + (Vector2(-2.5, -2.5) * s).rotated(rot), s * 2.6, Color(0.85, 0.95, 1.0, 0.8))
+
+	# 単色の板に見えないよう、輪郭にだけ光を乗せる。線は凹形状でも問題ない
+	var rim := _place(_rocket_body, at, s, rot)
+	rim.append(rim[0])
+	draw_polyline(rim, Color(0.97, 0.99, 1.0, 0.55), 2.5, true)
+
+
+## 炎を根元（ノズル）を軸に伸縮させる。全体に係数を掛けると機体との間に隙間が空く
+func _flicker_flame(src: PackedVector2Array, flicker: float) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for v in src:
+		out.append(Vector2(v.x, ROCKET_NOZZLE_Y + (v.y - ROCKET_NOZZLE_Y) * flicker))
+	return out
+
+
+func _place(src: PackedVector2Array, at: Vector2, s: float, rot: float) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for v in src:
+		out.append(at + (v * s).rotated(rot))
+	return out
 
 
 func _draw_meteors(w: float, h: float) -> void:
