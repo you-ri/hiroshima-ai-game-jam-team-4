@@ -37,4 +37,16 @@
 - 理由: `run/main_scene` が未設定だと誰も `check` を通せず、環境構築の成否が判定できない。ジャンル未定のためルートは中立な `Node`（2D/3D どちらにも寄せられる）とし、UI は `CanvasLayer` 配下に置いた。日本語表示の確認を兼ねてラベルに `SystemFont` を指定している。
 - 影響: 差し替え前提のプレースホルダ。作り込むときは `project.godot` の `run/main_scene` との整合を保つこと。ルートを 2D/3D どちらにするかは未決定。
 
+## 2026-08-11 ゲーム方針を「攻撃なしのロケット登り」にした（仮 main シーンを差し替え）
+- 理由: 2D 縦スクロールで、ロケットがプレイヤー。無操作で自然落下、W で噴射（炎）、A/D で左右旋回、ステージ最下部からスタートして 6 画面分（4320px）を登り最上部に到達でクリア。
+- 影響: `scenes/main.tscn` のルートを `Node2D` にした。ステージ寸法は設計解像度 1280x720 基準（`SCREEN_COUNT = 6`）。射撃・敵は無し。
+
+## 2026-08-11 入力アクションと設計解像度を project.godot に追加した
+- 理由: `ui_*` は矢印キーのみなので WASD 用に `thrust`(W) / `rotate_left`(A) / `rotate_right`(D) を `physical_keycode` で定義。ステージの「画面」の基準になるよう `window/size/viewport_width=1280` `viewport_height=720` も設定。
+- 影響: `[input]` セクションを追加。`get_viewport_rect()` は stretch 拡張で窓サイズを返すため、ステージ寸法はスクリプト内の `DESIGN_WIDTH/HEIGHT` 定数で固定（`scenes/main.gd`）。
+
+## 2026-08-11 ロケットは RigidBody2D、旋回は角速度の直接制御にした
+- 理由: 「物理的な挙動」の要望に合わせ、重力はプロジェクト既定（980）、推力は 1600（質量 1 換算で重力を上回る）。A/D は `angular_velocity = TURN_SPEED * axis` で毎物理フレーム上書きし、操作を離すと即座に停止するカチッとした挙動にした。
+- 影響: `actors/rocket/rocket.gd` + `rocket.tscn` を新規追加。クリア判定・落下リスポーン・左右の壁は `scenes/main.gd` 側。`RigidBody2D.global_position` の直接代入は物理が戻すため、リスポーンは freeze→transform 変更→unfreeze で行う。
+
 <!-- 以降、決定したことを追記していく -->
