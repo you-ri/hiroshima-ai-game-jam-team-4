@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://5ef2gfmr3mph" path="res://scenes/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://actors/rocket/rocket.tscn" id="2_rocket"]
 [ext_resource type="PackedScene" path="res://scenes/background.tscn" id="3_background"]
-[ext_resource type="Script" path="res://scenes/launch_pad.gd" id="4_launch_pad"]
+[ext_resource type="Script" uid="uid://gs6cuka74wjc" path="res://scenes/launch_pad.gd" id="4_launch_pad"]
 
 [sub_resource type="SystemFont" id="Font_ui"]
 font_names = PackedStringArray("Yu Gothic UI", "Meiryo UI", "MS UI Gothic", "Segoe UI")
@@ -19,7 +19,7 @@ position = Vector2(0, -30)
 
 [node name="Background" parent="." unique_id=582028447 instance=ExtResource("3_background")]
 
-[node name="LaunchPad" type="Node2D" parent="."]
+[node name="LaunchPad" type="Node2D" parent="." unique_id=1364461527]
 script = ExtResource("4_launch_pad")
 
 [node name="UI" type="CanvasLayer" parent="." unique_id=108755547]
