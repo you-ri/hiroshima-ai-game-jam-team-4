@@ -1,0 +1,21 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = tab
+indent_size = 4
+
+# Godot が生成・管理するファイル（整形しない）
+[*.{tscn,tres,godot,import,cfg,uid}]
+trim_trailing_whitespace = false
+insert_final_newline = false
+
+[*.{md,yml,yaml,json}]
+indent_style = space
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
