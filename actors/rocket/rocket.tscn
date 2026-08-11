@@ -1,0 +1,30 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://actors/rocket/rocket.gd" id="1_rocket"]
+
+[sub_resource type="CircleShape2D" id="Shape_rocket"]
+radius = 30.0
+
+[node name="Rocket" type="RigidBody2D"]
+script = ExtResource("1_rocket")
+
+[node name="Body" type="Polygon2D" parent="."]
+color = Color(0.72, 0.76, 0.82, 1)
+polygon = PackedVector2Array(0, -56, 18, -30, 18, -8, 30, 20, 18, 20, 18, 38, 0, 44, -18, 38, -18, 20, -30, 20, -18, -8, -18, -30)
+
+[node name="Nose" type="Polygon2D" parent="."]
+color = Color(0.9, 0.25, 0.2, 1)
+polygon = PackedVector2Array(0, -56, 12, -32, 0, -18, -12, -32)
+
+[node name="Flame" type="Polygon2D" parent="."]
+visible = false
+color = Color(1, 0.55, 0.1, 0.9)
+polygon = PackedVector2Array(0, 46, 12, 62, 0, 118, -12, 62)
+
+[node name="FlameCore" type="Polygon2D" parent="."]
+visible = false
+color = Color(1, 0.9, 0.5, 1)
+polygon = PackedVector2Array(0, 46, 7, 58, 0, 86, -7, 58)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("Shape_rocket")
