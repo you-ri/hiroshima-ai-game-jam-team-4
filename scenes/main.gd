@@ -44,14 +44,14 @@ const GAME_OVER_SCENE_PATH := "res://scenes/ui/game_over.tscn"
 ## 0 にすると何が起きたか分からないまま画面が変わる
 const RESULT_DELAY := 1.8
 
-## Spec: 岩は 0.5s ごと、速度 100〜150 m/s のランダム
+## Spec: 岩は 0.5s ごと、速度 120〜150 m/s のランダム
 const ROCK_INTERVAL := 0.5
-const ROCK_SPEED_MIN_MPS := 100.0
-const ROCK_SPEED_MAX_MPS := 150.0
-## Spec: 隕石は 0.7s ごと、速度 20〜50 m/s のランダム
+const ROCK_SPEED_MIN_MPS := 140.0
+const ROCK_SPEED_MAX_MPS := 170.0
+## Spec: 隕石は 0.7s ごと、速度 30〜50 m/s のランダム
 const METEOR_INTERVAL := 0.7
-const METEOR_SPEED_MIN_MPS := 20.0
-const METEOR_SPEED_MAX_MPS := 50.0
+const METEOR_SPEED_MIN_MPS := 40.0
+const METEOR_SPEED_MAX_MPS := 70.0
 ## カメラの半高さ（DESIGN_HEIGHT/2）より外側にスポーンさせるための余裕
 const SPAWN_OFFSET := 430.0
 

@@ -9,14 +9,21 @@ extends "res://scenes/main.gd"
 ## - 特殊  : 無敵中に岩・隕石を破壊するたび 500 点
 ##
 ## アイテム（Spec の Item セクション）:
-## - 5 秒ごとにプレイヤー真上 250m に 1 個生成。生成ごとに 10% で金色
+## - 5 秒ごとにプレイヤー上空 300m のランダムな X 位置に 1 個生成。10% 判定で金色
 ## - 金色を取ると 5 秒間無敵になり、接触した岩・隕石を破壊できる
 ## - 破壊判定は Rocket.destroy_on_contact → obstacle_destroyed シグナルで受け取る
+##
+## 速度は本編と差し替え: 岩 100〜130 m/s、隕石 30〜70 m/s（_spawn_obstacle を上書き）
+##
+## 結果表示はシーン遷移せず、このシーン内でスコア内訳を出し続ける
+## （クリア／ゲームオーバーどちらも）。SPACE でリトライ、ESC でタイトルへ。
+
+const TITLE_SCENE_PATH := "res://scenes/ui/title.tscn"
 
 const ESCAPE_POD_SCENE: PackedScene = preload("res://actors/escape_pod/escape_pod.tscn")
 
 const ITEM_SPAWN_INTERVAL := 5.0
-const ITEM_SPAWN_HIGH_M := 250.0
+const ITEM_SPAWN_HIGH_M := 300.0
 const GOLDEN_CHANCE := 0.10
 const POWER_INVULN_TIME := 5.0
 
@@ -26,7 +33,13 @@ const SCORE_LIFE := 3000
 const SCORE_ITEM := 1000
 const SCORE_SPECIAL := 500
 
+#const ROCK_SPEED_MIN_MPS := 120.0
+#const ROCK_SPEED_MAX_MPS := 130.0
+#const METEOR_SPEED_MIN_MPS := 30.0
+#const METEOR_SPEED_MAX_MPS := 70.0
+
 const AURA_COLOR := Color(1.0, 0.85, 0.4, 1.0)
+const RESULT_INPUT_DELAY := 0.8
 
 @onready var _score_label: Label = $UI/Score
 @onready var _breakdown_label: Label = $UI/Breakdown
@@ -44,6 +57,9 @@ var _special_count := 0
 var _play_elapsed := 0.0
 var _item_spawn_timer := 0.0
 var _power_invuln_timer := 0.0
+
+var _result_held := false
+var _result_input_delay := 0.0
 
 var _items: Node2D
 
@@ -77,14 +93,63 @@ func _physics_process(delta: float) -> void:
 			_end_power_invuln()
 
 
-## Spec: 5 秒ごとにプレイヤー真上 250m の位置に 1 個。10% 判定で金色
+func _process(delta: float) -> void:
+	super(delta)
+	if not _result_held:
+		return
+	_result_input_delay -= delta
+	if _result_input_delay > 0.0:
+		return
+	if Input.is_action_just_pressed("ui_accept"):
+		_replay()
+	elif Input.is_action_just_pressed("ui_cancel"):
+		_back_to_title()
+
+
+## 結果画面へ遷移せず、このシーンでスコア内訳を出し続ける
+func _go_to_result(path: String) -> void:
+	_finalize_score()
+	_show_breakdown()
+	_result_held = true
+	_result_input_delay = RESULT_INPUT_DELAY
+
+
+func _replay() -> void:
+	ScoreBoard.store(0, 0, 0, 0, 0, false)
+	get_tree().reload_current_scene()
+
+
+func _back_to_title() -> void:
+	get_tree().change_scene_to_file(TITLE_SCENE_PATH)
+
+
+## Spec: 5 秒ごとにプレイヤー上空 300m のランダムな X 位置に 1 個。10% 判定で金色
 func _spawn_escape_pod() -> void:
 	var pod: EscapePod = ESCAPE_POD_SCENE.instantiate()
 	pod.setup(randf() < GOLDEN_CHANCE)
 	_items.add_child(pod)
 	pod.global_position = Vector2(
-			clampf(_rocket.global_position.x, -HALF_STAGE_WIDTH + 60.0, HALF_STAGE_WIDTH - 60.0),
+			randf_range(-HALF_STAGE_WIDTH + 60.0, HALF_STAGE_WIDTH - 60.0),
 			_rocket.global_position.y - Units.m_to_px(ITEM_SPAWN_HIGH_M))
+
+
+## 本編の生成ロジックを流用し、速度だけ差し替える（岩 100-130 / 隕石 30-70 m/s）
+func _spawn_obstacle(meteor: bool) -> void:
+	var obstacle: Obstacle = OBSTACLE_SCENE.instantiate()
+
+	var x := _random_away_from(_rocket.global_position.x)
+	var py := _rocket.global_position.y
+
+	if meteor:
+		var speed := Units.m_to_px(randf_range(METEOR_SPEED_MIN_MPS, METEOR_SPEED_MAX_MPS))
+		obstacle.setup(true, Vector2(0.0, speed))
+	else:
+		var speed := Units.m_to_px(randf_range(ROCK_SPEED_MIN_MPS, ROCK_SPEED_MAX_MPS))
+		var angle := deg_to_rad(randf_range(0.0, 180.0))
+		obstacle.setup(false, Vector2(cos(angle), -sin(angle)) * speed)
+
+	_obstacles.add_child(obstacle)
+	obstacle.global_position = Vector2(x, py - SPAWN_OFFSET if meteor else py + SPAWN_OFFSET)
 
 
 func _on_item_caught(area: Area2D) -> void:
@@ -133,13 +198,6 @@ func _on_obstacle_destroyed(area: Area2D) -> void:
 	area.queue_free()
 
 
-## 決着時にスコアを確定する。タイムはクリア時のみ、残機もクリア時のみ加算
-func _go_to_result(path: String) -> void:
-	_finalize_score()
-	_show_breakdown()
-	await super(path)
-
-
 func _finalize_score() -> void:
 	var time_score := 0
 	if _cleared:
@@ -156,14 +214,15 @@ func _finalize_score() -> void:
 			_score_total, _score_time, _score_lives, _score_items, _score_special, _cleared])
 
 
-## 決着から結果画面へ移る余韻の間に、内訳を中央に出す
+## クリア／ゲームオーバー後にスコア内訳を中央に出し続ける
 func _show_breakdown() -> void:
 	_breakdown_label.text = ("クリア！ タイム %.1f 秒\n" if _cleared else "失敗…\n") \
 			+ "タイム  %d 点\n" % _score_time \
 			+ "残機    %d 点\n" % _score_lives \
 			+ "アイテム %d 点\n" % _score_items \
 			+ "特殊アクション %d 点\n" % _score_special \
-			+ "合計    %d 点" % _score_total
+			+ "合計    %d 点\n\n" % _score_total \
+			+ "SPACE: もう一度    ESC: タイトルへ"
 	_breakdown_label.visible = true
 
 
