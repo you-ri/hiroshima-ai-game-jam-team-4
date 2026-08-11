@@ -1,5 +1,5 @@
 extends Node2D
-## ステージ背景: 暗黒空間 + 星空 + 地上の夜景（山・街明かり）+ グリッド + 画面区切り線 + 壁 + ゴールライン。
+## ステージ背景: 暗黒空間 + 星空 + 地上の夜景（山・街明かり）+ 雲海 + グリッド + 画面区切り線 + 壁 + 大気圏界面（ゴール）。
 ## 純粋な見た目用（Physics に触れない）。stage 範囲は scenes/main.gd が setup() で与える。
 ## カメラが常にプレイヤー中心（クランプなし）のため、壁の外・ゴールの上まで描いておく。
 
@@ -16,6 +16,20 @@ const NEAR_MOUNTAIN_COLOR := Color(0.04, 0.05, 0.1, 1)
 const BUILDING_COLOR := Color(0.055, 0.065, 0.12, 1)
 const WINDOW_COLOR := Color(1.0, 0.8, 0.45, 0.8)
 const CITY_GLOW_COLOR := Color(0.45, 0.3, 0.45, 0.05)
+
+## 雲海（ステージ中腹。登っている実感を出すための通過目標）
+## 高度は m 単位で持ち、px へは Units で変換する（Spec の 3000m ＝ 6 画面と揃える）
+const CLOUD_LAYERS: Array[Dictionary] = [
+	# 奥ほど高く・暗く・小さい。手前ほど低く・明るく・大きい
+	{"altitude_m": 1180.0, "radius": Vector2(38.0, 72.0), "step": Vector2(48.0, 96.0),
+			"spread": 26.0, "color": Color(0.32, 0.36, 0.5, 0.32)},
+	{"altitude_m": 1100.0, "radius": Vector2(52.0, 98.0), "step": Vector2(64.0, 124.0),
+			"spread": 34.0, "color": Color(0.46, 0.5, 0.64, 0.4)},
+	{"altitude_m": 1020.0, "radius": Vector2(64.0, 124.0), "step": Vector2(78.0, 150.0),
+			"spread": 42.0, "color": Color(0.62, 0.66, 0.8, 0.46)},
+]
+## 雲海全体をぼんやり照らす帯（月明かりが雲に反射している感じ）
+const CLOUD_GLOW_COLOR := Color(0.35, 0.4, 0.58, 0.05)
 
 var _top_y := 0.0
 var _bottom_y := 0.0
@@ -70,6 +84,9 @@ func _draw() -> void:
 	# 地上の夜景（遠景の山 → 街明かり → 近景の山の順で奥から重ねる）
 	_draw_night_scenery(rng, left, right)
 
+	# 雲海（ステージ中腹。夜景より手前・壁より奥）
+	_draw_cloud_sea(rng, left, right)
+
 	# 左右の壁（コリジョンは main.gd 側。ここは見た目だけ）
 	for side: float in [-1.0, 1.0]:
 		var x0 := side * _half_width
@@ -103,6 +120,31 @@ func _draw_night_scenery(rng: RandomNumberGenerator, left: float, right: float) 
 
 	# 近景の山（低め・より暗い）
 	_draw_ridge(rng, left, right, 40.0, 150.0, 120.0, 260.0, NEAR_MOUNTAIN_COLOR)
+
+
+## ステージ中腹の雲海。奥（高く暗い）から手前（低く明るい）へ 3 層重ねる。
+## 円を横に並べてもこもこさせるだけの見た目用で、当たり判定は持たない
+func _draw_cloud_sea(rng: RandomNumberGenerator, left: float, right: float) -> void:
+	# 層全体に薄く広がる光。雲の帯がある高度をぼんやり明るく見せる
+	var glow_top := -Units.m_to_px(CLOUD_LAYERS[0]["altitude_m"] as float) - 120.0
+	var glow_bottom := -Units.m_to_px(CLOUD_LAYERS[-1]["altitude_m"] as float) + 120.0
+	for i in 3:
+		var inset := i * 60.0
+		draw_rect(Rect2(left, glow_top + inset, right - left,
+				(glow_bottom - glow_top) - inset * 2.0), CLOUD_GLOW_COLOR)
+
+	for layer in CLOUD_LAYERS:
+		var base_y := -Units.m_to_px(layer["altitude_m"] as float)
+		var radius: Vector2 = layer["radius"]
+		var step: Vector2 = layer["step"]
+		var spread: float = layer["spread"]
+		var color: Color = layer["color"]
+		# 端が切れて見えないよう、描画範囲の外側から始めて外側まで並べる
+		var x := left - radius.y
+		while x < right + radius.y:
+			var r := rng.randf_range(radius.x, radius.y)
+			draw_circle(Vector2(x, base_y + rng.randf_range(-spread, spread)), r, color)
+			x += rng.randf_range(step.x, step.y)
 
 
 ## 稜線をランダムに折りながら left→right へ走らせ、地面より下（+60）で閉じる
