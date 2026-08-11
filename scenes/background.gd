@@ -1,6 +1,6 @@
 extends Node2D
 ## ステージ背景: 暗黒空間 + 星空 + 地上の夜景（山・街明かり）+ 隕石群の落下と着弾爆発 +
-## 各所の火災 + 雲海 + アポフィス + グリッド + 画面区切り線 + 壁 + 大気圏界面（ゴール）。
+## 各所の火災 + 雲海 + アポフィス + 壁 + 大気圏界面（ゴール）。
 ## 純粋な見た目用（Physics に触れない）。stage 範囲は scenes/main.gd が setup() で与える。
 ## カメラが常にプレイヤー中心（クランプなし）のため、壁の外・ゴールの上まで描いておく。
 ## 隕石・火災のアニメーションのため毎フレーム全体を再描画する（全て手続き描画なので軽い）。
@@ -176,7 +176,6 @@ var _top_y := 0.0
 var _bottom_y := 0.0
 var _half_width := 640.0
 var _screen_sep := 720.0
-var _grid_step := 64.0
 ## アニメーション用の経過時間（隕石の落下位相・火災のちらつきに使う）
 var _t := 0.0
 ## 旅客機の演出。カメラが所定高度を超えたら開始し、以後 _plane_t を進める
@@ -321,16 +320,6 @@ func _draw() -> void:
 		var alpha := rng.randf_range(0.2, 0.85)
 		draw_circle(p, radius, Color(0.85, 0.9, 1.0, alpha))
 
-	# グリッド（ステージ内のみ、うっすら）
-	var x := -_half_width
-	while x <= _half_width:
-		draw_line(Vector2(x, _top_y), Vector2(x, _bottom_y), Color(0.08, 0.1, 0.14, 1), 1.0)
-		x += _grid_step
-	var y := _top_y
-	while y <= _bottom_y:
-		draw_line(Vector2(-_half_width, y), Vector2(_half_width, y), Color(0.08, 0.1, 0.14, 1), 1.0)
-		y += _grid_step
-
 	# 地上の夜景（遠景の山 → 街明かり → 近景の山の順で奥から重ねる）
 	_draw_night_scenery(rng, left, right)
 
@@ -370,12 +359,6 @@ func _draw() -> void:
 		var x1 := side * (_half_width + 24.0)
 		draw_rect(Rect2(minf(x0, x1), _top_y - 200.0, absf(x1 - x0), _bottom_y - _top_y + 200.0),
 				Color(0.28, 0.26, 0.33, 1))
-
-	# 画面区切り（最上部の大気圏界面と重ならないよう +1 画面分から）
-	var sep := _top_y + _screen_sep
-	while sep < _bottom_y:
-		draw_line(Vector2(-_half_width, sep), Vector2(_half_width, sep), Color(0.85, 0.5, 0.15, 0.5), 2.0)
-		sep += _screen_sep
 
 	# 大気圏界面（ゴール。壁より手前に描いて一番目立たせる）
 	_draw_atmosphere_edge()

@@ -180,7 +180,8 @@ func _process(delta: float) -> void:
 		# 大気圏突破の演出中もアポフィスは居るので、固定位置の上に微振動だけ乗せる
 		_camera.global_position = _camera_locked_pos + offset
 	else:
-		_camera.global_position = _rocket.global_position + offset
+		# 横スクロールはしない: x はステージ中央（0）に固定し、縦だけ追従する
+		_camera.global_position = Vector2(offset.x, _rocket.global_position.y + offset.y)
 	_update_hud()
 
 	if _message_timer > 0.0:
