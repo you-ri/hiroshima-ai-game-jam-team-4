@@ -23,10 +23,11 @@
 | ノードが `null` | `$Path` とノード名が不一致 | ノード名を確認。リネームしたら参照元も直す |
 | 入力が効かない | アクション名の綴り違い（`InputMap` に無いアクションは黙って false） | `Input.action_press("名前")` を検証スクリプトで撃って挙動が変わるか見る |
 | WASD が効かない | `ui_*` は既定で矢印キーのみ | `project.godot` の `[input]` に自分で定義（[godot-conventions.md](godot-conventions.md)） |
-| 前後の移動が逆 | `Input.get_vector` は「奥方向 = y が -1」 | 符号を反転する |
-| RigidBody を動かしても戻される | `global_position` 代入は物理サーバーに効かない | `_integrate_forces(state)` で `state.transform` / `state.linear_velocity` を設定 |
-| 接地判定が効かない | 子の RayCast3D が本体と一緒に回転している | `get_world_3d().direct_space_state.intersect_ray()` を毎フレーム呼ぶ |
-| 物理の挙動がネットの記事と違う | このプロジェクトは **Jolt** を使っている | Godot Physics 前提の数値をそのまま使わない |
+| 上下の移動が逆 | 2D は **y が下向き**（上へ登るほど y は負） | 符号を確認する |
+| RigidBody2D を動かしても戻される | `global_position` 代入は物理サーバーに効かない | `_integrate_forces(state)` で `state.transform` / `state.linear_velocity` を設定。リスポーンは freeze → 変更 → unfreeze |
+| `Can't change this state while flushing queries` | `area_entered` などの物理コールバック中に `freeze` を切り替えた | `set_deferred("freeze", true)` / `処理.call_deferred()` に逃がす |
+| 当たり判定が効かない（Area2D） | `collision_layer` / `collision_mask` が噛み合っていない。`monitorable = false` の見落とし | 検出する側に mask、される側に layer（Rocket の `Hitbox` は mask=2、障害物は layer=2） |
+| W を押しっぱなしで上がらない | 仕様どおり（`thrust` は連打式で 1 入力 1 噴射） | 検証では `action_press` の後に `action_release` を入れる |
 | 壁をよじ登る | 摩擦で押し上がっている | 検証中の `y` の最大値を見る。形状か摩擦を調整 |
 
 ## 表示

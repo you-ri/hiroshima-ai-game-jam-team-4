@@ -6,10 +6,10 @@
 ## ディレクトリ構成
 
 ```
-scenes/          画面・ステージ。main.tscn, stage_01.tscn, ui/title.tscn
+scenes/          画面・ステージ。main.tscn, ui/title.tscn
 actors/          再利用する実体。1 機能 1 フォルダで .tscn と .gd を同居
-                   actors/player/player.tscn
-                   actors/player/player.gd
+                   actors/rocket/rocket.tscn
+                   actors/rocket/rocket.gd
 scripts/         autoload・共通ユーティリティ（どのシーンにも属さないコード）
 assets/art/      画像・モデル
 assets/audio/    BGM・SE
@@ -21,7 +21,7 @@ docs/            ドキュメント
 **`actors/<機能>/` に閉じ込めるのが衝突回避の要。** 自分の担当機能のフォルダの中だけで完結させ、
 `scenes/main.tscn` は各 actor をインスタンス化するだけの薄いシーンに保つ。
 
-構成を変える場合は、理由が分かるように PR の説明に書く。
+構成を変える場合は、理由が分かるようにコミットメッセージに書く。
 
 ## 命名
 
@@ -42,7 +42,7 @@ docs/            ドキュメント
 - インデントは**タブ**（Godot の標準。[.editorconfig](../.editorconfig) 参照）。
 - 型は書く。`var speed := 5.0` / `func apply_damage(amount: int) -> void:`
 - `var x := load(...)` は **Variant になって `Cannot infer the type of "x"` になる。** `var x: PackedScene = load(...)` と明示する。
-- ノード参照は `@onready var _mesh: MeshInstance3D = $Mesh`。
+- ノード参照は `@onready var _flame: Polygon2D = $Flame`。
 - 状態は**持ち主に持たせる**。収集物側でスコアを数えず、シグナルで親へ投げて親が数える。
 - `class_name` を足したら `bash tools/godot.sh import` を回す（`.godot/global_script_class_cache.cfg` が更新されるまで他スクリプトから解決できない）。
 
@@ -53,21 +53,21 @@ INI 風のテキスト。セクションの順序は固定: `gd_scene` → `ext_
 ```
 [gd_scene load_steps=4 format=3]
 
-[ext_resource type="Script" path="res://actors/player/player.gd" id="1_player"]
-[ext_resource type="PackedScene" path="res://actors/coin/coin.tscn" id="2_coin"]
+[ext_resource type="Script" path="res://actors/rocket/rocket.gd" id="1_rocket"]
+[ext_resource type="PackedScene" path="res://actors/obstacle/obstacle.tscn" id="2_obstacle"]
 
-[sub_resource type="SphereShape3D" id="Shape_ball"]
-radius = 0.5
+[sub_resource type="CircleShape2D" id="Shape_rocket"]
+radius = 30.0
 
-[node name="Player" type="CharacterBody3D"]
-script = ExtResource("1_player")
+[node name="Rocket" type="RigidBody2D"]
+script = ExtResource("1_rocket")
 
-[node name="Shape" type="CollisionShape3D" parent="."]
-shape = SubResource("Shape_ball")
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("Shape_rocket")
 
-[node name="Coin" parent="." instance=ExtResource("2_coin")]
+[node name="Obstacle" parent="." instance=ExtResource("2_obstacle")]
 
-[connection signal="body_entered" from="Area" to="." method="_on_body_entered"]
+[connection signal="area_entered" from="Hitbox" to="." method="_on_hitbox_area_entered"]
 ```
 
 - `format=3` が Godot 4。`load_steps` は `ext_resource` + `sub_resource` の総数 + 1。
@@ -76,16 +76,16 @@ shape = SubResource("Shape_ball")
 - `sub_resource` は参照される前に定義する。
 - `path=` の代わりに `uid="uid://..."` も使えるが、手書きでは `path=` でよい。
 
-### Node3D の配置
+### Node2D の配置
 
 ```
-position = Vector3(0, 1.5, 0)
-rotation_degrees = Vector3(0, 90, 0)     # 度数で書ける。手計算不要
-scale = Vector3(2, 2, 2)
+position = Vector2(0, -120)
+rotation = 1.5708                        # ラジアン。度数で書きたいなら rotation_degrees
+scale = Vector2(2, 2)
 ```
 
-`Transform3D(...)` の引数は**基底ベクトルを列で並べた順**（行優先で書くと転置される）。
-`position` / `rotation_degrees` で済むならそちらを使う。
+**2D は y が下向き。** 上へ登るほど `y` は負になる（このゲームのゴールは `y = -4350`）。
+`Transform2D(...)` を手書きするより `position` / `rotation_degrees` で済ませる。
 
 ### Control（UI）
 
@@ -145,7 +145,8 @@ move_left={
 | R | 82 | Escape | 4194305 |
 | ← / ↑ / → / ↓ | 4194319 / 4194320 / 4194321 / 4194322 | Enter | 4194309 |
 
-`Input.get_vector(neg_x, pos_x, neg_y, pos_y)` は「奥方向 = y が -1」を返す。3D の前後に使うときは符号の反転を忘れない。
+左右 1 軸だけなら `Input.get_axis(neg, pos)` で足りる（`rocket.gd` の旋回がこれ）。
+`Input.get_vector(...)` を使う場合、**2D は y が下向き**なので「上 = -1」。符号の扱いを間違えやすい。
 
 ## よく踏む罠
 
@@ -154,22 +155,23 @@ move_left={
 | 症状 | 原因 | 対処 |
 |---|---|---|
 | UI の日本語が豆腐／空白 | 内蔵フォントに CJK グリフが無い | `SystemFont` を `theme_override_fonts/font` に指定 |
-| RigidBody を移動させても戻される | `global_position` への代入は物理サーバーの状態を書き換えない | `_integrate_forces(state)` 内で `state.transform` / `state.linear_velocity` を設定 |
-| 転がる物体の接地判定が効かない | 子の RayCast3D は本体と一緒に回転する | `get_world_3d().direct_space_state.intersect_ray()` を毎フレーム直接呼ぶ |
+| RigidBody2D を移動させても戻される | `global_position` への代入は物理サーバーの状態を書き換えない | `_integrate_forces(state)` 内で `state.transform` / `state.linear_velocity` を設定。リスポーンは freeze → transform 変更 → unfreeze |
+| `Can't change this state while flushing queries` | `area_entered` などの物理コールバック中に `freeze` やノード追加をした | `set_deferred("freeze", true)` / `処理.call_deferred()` に逃がす（`scenes/main.gd` の被弾処理） |
+| Area2D 同士が当たらない | 片方の `collision_layer` ともう片方の `collision_mask` が噛み合っていない。`monitorable = false` も見落としやすい | 検出する側に mask、検出される側に layer（Rocket の `Hitbox` は mask=2、障害物は layer=2） |
 | `Cannot infer the type of "x"` | `var x := load(...)` は Variant | `var x: PackedScene = load(...)` |
 | 入力が効かない | アクション名の綴り違い。`InputMap` に無いアクションは黙って false | 検証スクリプトで `Input.action_press("名前")` を撃って挙動が変わるか見る |
 | ノードが `null` | `$Path` はノード名に完全一致で依存 | リネームしたら参照元スクリプトも直す |
 | 追加したシーン／`class_name` が見つからない | インポート未実行 | `bash tools/godot.sh import` |
 
-3D 物理は **Jolt** を使っている。コリジョン挙動や一部の `PhysicsServer3D` パラメータが既定エンジンと違うので、
-ネットで拾った Godot Physics 前提の数値をそのまま信じない。
+`project.godot` の Jolt 設定は **3D 物理にしか効かない。** このゲームは 2D なので、
+挙動を疑うときに Jolt を犯人にしない（2D は Godot 標準の物理）。
 
-## まだ決まっていないこと（着手時に決める）
+## このゲームの前提（`scenes/main.tscn`）
 
-`scenes/main.tscn` は**仮のプレースホルダ**（ルート `Main`(Node) ＋ `UI`(CanvasLayer) ＋ ラベル 2 枚）で、
-`run/main_scene` は設定済み。差し替えるときは以下を決める。
+仮シーンではなく本編。作り込むときの決まりごと:
 
-- ルートを 2D にするか 3D にするか（仮シーンのルートは中立な `Node`。世界のノードを足す人が決める）
-- 入力アクションの命名（`move_left` などチーム共通で使う名前。`ui_*` は矢印キーのみなので自分で定義する）
-- スコアなど共有状態の置き場所（autoload にするか、main シーンが持つか）
-- カメラの基準（移動方向をカメラ basis から作るか、ワールド固定か）
+- ルートは `Node2D`。ステージ寸法は `DESIGN_WIDTH/HEIGHT`(1280x720) 定数で固定する。
+  `get_viewport_rect()` は stretch 拡張で**実ウィンドウサイズ**を返すので、ステージ計算に使わない。
+- 地面の上面が世界 `y = 0`（＝高度 0m）。上へ行くほど `y` は負。ゴールは 6 画面分（`SCREEN_COUNT = 6`）。
+- 共有状態（残機・高度・クリア判定）は autoload ではなく `scenes/main.gd` が持つ。
+- 入力アクションは `thrust` / `rotate_left` / `rotate_right`。追加するときは動詞の `snake_case` で揃える。

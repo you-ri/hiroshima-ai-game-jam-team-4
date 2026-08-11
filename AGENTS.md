@@ -11,7 +11,10 @@
 
 - 広島 AI ゲームジャム team 4 の Godot **4.7.1-stable** プロジェクト（Forward+ / GDScript）。
 - リモート: `https://github.com/you-ri/hiroshima-ai-game-jam-team-4`
-- 作っているのは **「Apophis」— 2D 縦スクロールのロケットクライマー**（射撃なし）。W で噴射、A / D で旋回し、重力に逆らって 6 画面分登り切ればクリア。落ちたらスタート位置へ戻される。実装は `scenes/main.gd`（ステージ・クリア判定・リスポーン）と `actors/rocket/`（RigidBody2D の物理挙動）が本体。`scenes/main.tscn` は**本番シーン**であり、もう仮ではない。
+- 作っているのは **「アポフィス（Apophis）」— 2D 縦スクロールのロケットクライマー**（射撃なし）。W 連打で噴射、A / D で旋回し、重力に逆らって 6 画面分登り切ればクリア。下から来る岩と上から来る隕石に当たると残機が減り（初期 3）、スタート地点へ戻される。0 で失敗。
+  - **仕様の正は [docs/Spec.txt](docs/Spec.txt)。** 実装がここと食い違っていたら実装のほうが誤り（現在いくつかズレが残っている）。
+  - 実装: `scenes/main.gd`（ステージ・カメラ・クリア／被弾判定・障害物スポーン）、`actors/rocket/`（RigidBody2D の物理挙動）、`actors/obstacle/`（岩・隕石。Area2D）、`scenes/ui/`（タイトル・クリア・ゲームオーバー）。
+  - `scenes/main.tscn` は本番シーン。ルートは `Node2D`、地面の上面が世界 `y = 0`（高度 0m）で、上へ行くほど `y` は負。
 - **開発 OS は Windows 限定**（Git Bash 前提）。macOS / Linux 向けの分岐は書かない。
 - **複数メンバーが別々のマシン・別々の AI 環境で同時に触る。** 自分の手元だけで通ることより、他人の環境で再現することを優先する。
 
@@ -49,8 +52,11 @@ bash tools/godot.sh verify res://_verify_player.gd
 ## 4. ディレクトリ構成
 
 ```
-scenes/     画面・ステージ（main.tscn ＝ ゲーム本編, ui/title.tscn ＝ タイトル画面）
-actors/     再利用する実体。1 機能 1 フォルダで .tscn と .gd を同居させる（actors/rocket/rocket.tscn + rocket.gd）
+scenes/     画面・ステージ（main.tscn ＝ ゲーム本編, background.gd ＝ 背景）
+              ui/  title.tscn / game_clear.tscn / game_over.tscn
+actors/     再利用する実体。1 機能 1 フォルダで .tscn と .gd を同居させる
+              rocket/    プレイヤー（RigidBody2D）
+              obstacle/  岩・隕石（Area2D）
 scripts/    autoload・共通ユーティリティ（どのシーンにも属さないコード）
 assets/     art/ audio/ fonts/
 tools/      godot.sh / godot.ps1
@@ -66,8 +72,7 @@ docs/       このドキュメント群
 - Godot バイナリのフルパスをスクリプトやドキュメントに直書き（`tools/godot.sh` の解決順に任せる）
 - 検証用の使い捨てスクリプト（`_verify_*.gd`）と `.gd.uid` の commit（gitignore 済みだが生成したら消す）
 - C# の使用（`_mono_` の付かないビルドでは動かない。GDScript で書く）
-- `main` ブランチへの直接 push（[docs/team-rules.md](docs/team-rules.md)）
-- 他メンバーが編集中の `.tscn` の同時編集
+- 他メンバーが編集中の `.tscn` の同時編集（[docs/team-rules.md](docs/team-rules.md)）
 
 ## 6. project.godot の現在の設定
 
@@ -78,7 +83,7 @@ docs/       このドキュメント群
 | `run/main_scene` | `res://scenes/main.tscn` | ゲーム本編。差し替えるときはこの設定も合わせる（消すと `Can't run project` で全員が動かせなくなる） |
 | `[input]` | `thrust`(W) / `rotate_left`(A) / `rotate_right`(D) | 定義済みアクション。追加するときは既存の命名（動詞 `snake_case`）に合わせ、`physical_keycode` で書く |
 | stretch | `canvas_items` / `expand` | 基準ビューポートに対して UI を組む。ウィンドウサイズからピクセル位置を計算しない |
-| 3D physics | Jolt Physics | 一部の `PhysicsServer3D` 挙動が既定エンジンと違う |
+| 3D physics | Jolt Physics | **2D には効かない。** このゲームは 2D なので実質未使用 |
 | renderer | Forward+ / D3D12(Windows) | シェーダは Forward+ 互換で書く |
 
 テキストは UTF-8 / LF（[.editorconfig](.editorconfig), [.gitattributes](.gitattributes)）。

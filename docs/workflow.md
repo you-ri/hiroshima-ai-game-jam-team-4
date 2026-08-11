@@ -35,20 +35,21 @@ extends SceneTree
 
 var _t := 0.0
 var _main: Node
-var _player: CharacterBody3D
+var _rocket: RigidBody2D
 var _done := {}
 
 func _initialize() -> void:
 	var packed: PackedScene = load("res://scenes/main.tscn")
 	_main = packed.instantiate()
 	root.add_child(_main)          # これを忘れると _ready() も物理も走らない
-	_player = _main.get_node("Player")
+	_rocket = _main.get_node("Rocket")
 
 # true を返すと終了する
 func _process(delta: float) -> bool:
 	_t += delta
-	_at(1.0, func(): Input.action_press("move_forward"))
-	_at(2.0, func(): print("speed = %.2f" % _player.velocity.length()))
+	_at(1.0, func(): Input.action_press("thrust"))
+	_at(1.1, func(): Input.action_release("thrust"))   # 連打式なので押しっぱなしでは 1 回しか効かない
+	_at(2.0, func(): print("speed = %.2f" % _rocket.linear_velocity.length()))
 	if _t >= 3.0:
 		print("pos = %.2v" % _player.global_position)
 		return true
@@ -76,7 +77,7 @@ func _at(mark: float, fn: Callable) -> void:
 |---|---|
 | 床に正しく乗っているか | 静止後の `global_position.y` が形状の半径/高さと一致するか |
 | 入力が繋がっているか | `Input.action_press()` の前後で速度・位置が変化するか |
-| 移動方向が正しいか | 前進入力でどの軸へ動くか（**符号**を確認） |
+| 移動方向が正しいか | 噴射で `y` が**減る**か（2D は上が負。**符号**を確認） |
 | 上限速度が効いているか | 十分加速させた後の水平速度が設定値でクランプされるか |
 | 当たり判定が働くか | `Area` に触れさせて対象が消えたか（子ノード数の減少） |
 | 壁で止まるか | 押し付け続けた後の座標と、その間の `y` の最大値（摩擦でよじ登ることがある） |
@@ -85,7 +86,7 @@ func _at(mark: float, fn: Callable) -> void:
 
 ## 作業の粒度
 
-- **1 タスク = 1 機能 = 1 ブランチ = 1 PR。** ジャム中は特に、大きな変更を溜めない。
+- **1 タスク = 1 機能 = 1 コミット。** ジャム中は特に、大きな変更を溜めない（[team-rules.md](team-rules.md)）。
 - 実装前に、触るファイルを宣言してから書き始める（他メンバーとの衝突は着手前にしか防げない）。
 - 実装が終わったら **`check` + `verify` の出力を報告に貼る。** 「たぶん動く」で渡さない。
 

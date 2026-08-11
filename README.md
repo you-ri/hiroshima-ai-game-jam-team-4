@@ -1,6 +1,6 @@
 # hiroshima-ai-game-jam-team-4
 
-広島 AI ゲームジャム team 4 の Godot **4.7.1-stable** プロジェクト（Forward+ / GDScript / Jolt Physics）。
+広島 AI ゲームジャム team 4 の Godot **4.7.1-stable** プロジェクト（Forward+ / GDScript / 2D）。
 **AI エージェント（Claude Code / OpenCode など）で複数人が同時に開発する**前提で構成している。
 
 開発 OS は **Windows 限定**。コマンドは **Git Bash** で実行する。
@@ -17,8 +17,8 @@ bash tools/godot.sh import    # アセットのインポート
 
 `path` で見つからないと言われたら [docs/setup.md](docs/setup.md) へ。
 
-> `scenes/main.tscn` は**仮のプレースホルダ**（ラベルを出すだけ）。ゲーム本体はこれから作る。
-> `bash tools/godot.sh check` が `--- OK: ERROR なし` で終われば環境は正常。
+> 作っているのは **「アポフィス（Apophis）」— 2D 縦スクロールのロケットクライマー**（射撃なし）。
+> `scenes/main.tscn` がゲーム本編。`bash tools/godot.sh check` が `--- OK: ERROR なし` で終われば環境は正常。
 
 ## よく使うコマンド
 

@@ -50,7 +50,7 @@ cd hiroshima-ai-game-jam-team-4
 bash tools/godot.sh path      # 解決されたバイナリのパスが出る
 bash tools/godot.sh version   # 4.7.1.stable.official....
 bash tools/godot.sh import    # .godot/ が生成される → "--- OK: ERROR なし"
-bash tools/godot.sh check     # 仮の main シーンが起動する → "--- OK: ERROR なし"
+bash tools/godot.sh check     # main シーンが起動する → "--- OK: ERROR なし"
 ```
 
 `path` で「Godot 本体が見つからない」と出たら 2 に戻る。
@@ -58,11 +58,11 @@ bash tools/godot.sh check     # 仮の main シーンが起動する → "--- OK
 `check` が次のように出れば準備完了:
 
 ```
-[main] ready: 仮のメインシーン
+[main] ready height=4320 goal_y=-4350 lives=3
 --- OK: ERROR なし
 ```
 
-`bash tools/godot.sh run` でウィンドウ起動すると、同じ内容が画面に出る（日本語が豆腐になっていなければフォント設定も正常）。
+`bash tools/godot.sh run` でウィンドウ起動するとゲーム本編が立ち上がる（HUD の日本語が豆腐になっていなければフォント設定も正常）。
 
 ## 4. シェルについて
 
