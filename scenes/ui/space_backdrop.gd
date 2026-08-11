@@ -13,6 +13,11 @@ extends Control
 @export var earth_destroyed := false
 ## 脱出したロケットを大きく描くか。ゲームクリア画面だけ true。
 @export var show_rocket := false
+## 接近中の小惑星 Apophis を描くか。決着後の画面（地球が砕けたあと）では
+## すでに衝突済みなので false にする。
+## 描画を止めるだけで生成（_build_rock）は必ず通す。飛ばすと乱数の消費がずれて
+## 星の配置がタイトルと変わってしまう。
+@export var show_asteroid := true
 
 ## 星の数。増やしても見た目はあまり変わらず _draw のコストだけ上がる
 const STAR_COUNT := 240
@@ -101,7 +106,8 @@ func _draw() -> void:
 	_draw_stars(w, h)
 	_draw_earth(w, h)
 	_draw_meteors(w, h)
-	_draw_apophis(w, h)
+	if show_asteroid:
+		_draw_apophis(w, h)
 	if show_rocket:
 		_draw_rocket(w, h)
 

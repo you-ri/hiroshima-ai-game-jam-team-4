@@ -22,6 +22,13 @@ const WALL_THICKNESS := 24.0
 const START_LIVES := 3
 const INVULN_TIME := 2.0
 
+## 結果画面（クリア／ゲームオーバー）の遷移先
+const GAME_CLEAR_SCENE_PATH := "res://scenes/ui/game_clear.tscn"
+const GAME_OVER_SCENE_PATH := "res://scenes/ui/game_over.tscn"
+## 決着してから結果画面へ切り替わるまでの余韻（秒）。
+## 0 にすると何が起きたか分からないまま画面が変わる
+const RESULT_DELAY := 1.8
+
 const ROCK_SPEED := 130.0
 const METEOR_SPEED := 180.0
 const ROCK_INTERVAL := 1.5
@@ -93,6 +100,7 @@ func _physics_process(delta: float) -> void:
 		_rocket.freeze = true
 		_show_message("クリア！")
 		print("[main] CLEARED at y=%.1f" % _rocket.global_position.y)
+		_go_to_result(GAME_CLEAR_SCENE_PATH)
 		return
 	_spawn_timer_rock -= delta
 	_spawn_timer_meteor -= delta
@@ -127,12 +135,21 @@ func _on_rocket_hit() -> void:
 		_rocket.set_deferred("freeze", true)
 		_show_message("失敗…残機なし")
 		print("[main] GAME OVER")
+		_go_to_result(GAME_OVER_SCENE_PATH)
 		return
 	# リスポーンもフラッシュ中に走るので deferred で実行する
 	_respawn_to_start.call_deferred()
 	_rocket.set_invulnerable(true)
 	_invuln_timer = INVULN_TIME
 	_show_message("スタートへ戻った")
+
+
+## 結果画面へ切り替える。余韻を挟んでから遷移する。
+## 呼び出し元は _cleared / _game_over を立ててから呼ぶので、二重に走ることはない。
+func _go_to_result(path: String) -> void:
+	await get_tree().create_timer(RESULT_DELAY).timeout
+	if is_inside_tree():
+		get_tree().change_scene_to_file(path)
 
 
 func _respawn_to_start() -> void:
