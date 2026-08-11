@@ -6,7 +6,7 @@
 ## ディレクトリ構成
 
 ```
-scenes/          画面・ステージ。main.tscn, ui/title.tscn
+scenes/          画面・ステージ。copy_main.tscn（本編）, main.tscn（旧試作）, ui/title.tscn
 actors/          再利用する実体。1 機能 1 フォルダで .tscn と .gd を同居
                    actors/rocket/rocket.tscn
                    actors/rocket/rocket.gd
@@ -19,7 +19,7 @@ docs/            ドキュメント
 ```
 
 **`actors/<機能>/` に閉じ込めるのが衝突回避の要。** 自分の担当機能のフォルダの中だけで完結させ、
-`scenes/main.tscn` は各 actor をインスタンス化するだけの薄いシーンに保つ。
+本編シーン（`scenes/copy_main.tscn`）は各 actor をインスタンス化するだけの薄いシーンに保つ。
 
 構成を変える場合は、理由が分かるようにコミットメッセージに書く。
 
@@ -123,7 +123,7 @@ font_names = PackedStringArray("Yu Gothic UI", "Meiryo UI", "MS UI Gothic", "Seg
 
 ```
 [application]
-run/main_scene="res://scenes/main.tscn"    ; 未設定だと実行できない
+run/main_scene="res://scenes/ui/title.tscn"    ; 未設定だと実行できない。起動はタイトルから
 ```
 
 入力アクションは `[input]` セクション。`ui_*` は既定で矢印キーのみなので、WASD が欲しければ自分で定義する。
@@ -156,7 +156,7 @@ move_left={
 |---|---|---|
 | UI の日本語が豆腐／空白 | 内蔵フォントに CJK グリフが無い | `SystemFont` を `theme_override_fonts/font` に指定 |
 | RigidBody2D を移動させても戻される | `global_position` への代入は物理サーバーの状態を書き換えない | `_integrate_forces(state)` 内で `state.transform` / `state.linear_velocity` を設定。リスポーンは freeze → transform 変更 → unfreeze |
-| `Can't change this state while flushing queries` | `area_entered` などの物理コールバック中に `freeze` やノード追加をした | `set_deferred("freeze", true)` / `処理.call_deferred()` に逃がす（`scenes/main.gd` の被弾処理） |
+| `Can't change this state while flushing queries` | `area_entered` などの物理コールバック中に `freeze` やノード追加をした | `set_deferred("freeze", true)` / `処理.call_deferred()` に逃がす（`scenes/copy_main.gd` の被弾処理） |
 | Area2D 同士が当たらない | 片方の `collision_layer` ともう片方の `collision_mask` が噛み合っていない。`monitorable = false` も見落としやすい | 検出する側に mask、検出される側に layer（Rocket の `Hitbox` は mask=2、障害物は layer=2） |
 | `Cannot infer the type of "x"` | `var x := load(...)` は Variant | `var x: PackedScene = load(...)` |
 | 入力が効かない | アクション名の綴り違い。`InputMap` に無いアクションは黙って false | 検証スクリプトで `Input.action_press("名前")` を撃って挙動が変わるか見る |
@@ -166,13 +166,13 @@ move_left={
 `project.godot` の Jolt 設定は **3D 物理にしか効かない。** このゲームは 2D なので、
 挙動を疑うときに Jolt を犯人にしない（2D は Godot 標準の物理）。
 
-## このゲームの前提（`scenes/main.tscn`）
+## このゲームの前提（`scenes/copy_main.tscn`）
 
-仮シーンではなく本編。作り込むときの決まりごと:
+本編シーンは `copy_main.tscn`（`main.tscn` は旧試作。機能追加は copy_main 側へ）。作り込むときの決まりごと:
 
 - ルートは `Node2D`。ステージ寸法は `DESIGN_WIDTH/HEIGHT`(1280x720) 定数で固定する。
   `get_viewport_rect()` は stretch 拡張で**実ウィンドウサイズ**を返すので、ステージ計算に使わない。
 - 地面の上面が世界 `y = 0`（＝高度 0m）。上へ行くほど `y` は負。ゴールは高度 3000m ＝ 6 画面分。
   m ↔ px の換算は `scripts/units.gd`（`Units`、1m = 1.44px）。速度・高度の定数は m 単位で書く。
-- 共有状態（残機・高度・クリア判定）は autoload ではなく `scenes/main.gd` が持つ。
+- 共有状態（残機・高度・クリア判定）は autoload ではなく `scenes/copy_main.gd` が持つ。
 - 入力アクションは `thrust` / `rotate_left` / `rotate_right`。追加するときは動詞の `snake_case` で揃える。

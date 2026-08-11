@@ -14,8 +14,8 @@
 - 作っているのは **「アポフィス（Apophis）」— 2D 縦スクロールのロケットクライマー**（射撃なし）。W 連打で噴射、A / D で旋回し、重力に逆らって 6 画面分登り切ればクリア。下から来る岩と上から来る隕石に当たると残機が減り（初期 3）、スタート地点へ戻される。0 で失敗。
   - **仕様の正は [docs/Spec.txt](docs/Spec.txt)。** 実装がここと食い違っていたら実装のほうが誤り。
   - 仕様の「ゴール 3000m」と「6 画面上部でクリア」は **1m = 1.44px**（`scripts/units.gd` の `Units`）で両立させている。速度・高度の定数は m 単位で持ち、px へは `Units` で変換する。
-  - 実装: `scenes/main.gd`（ステージ・カメラ・クリア／被弾判定・障害物スポーン）、`actors/rocket/`（RigidBody2D の物理挙動）、`actors/obstacle/`（岩・隕石。Area2D）、`scenes/ui/`（タイトル・クリア・ゲームオーバー）。
-  - `scenes/main.tscn` は本番シーン。ルートは `Node2D`、地面の上面が世界 `y = 0`（高度 0m）で、上へ行くほど `y` は負。
+  - 実装: `scenes/copy_main.gd`（ステージ・カメラ・クリア／被弾判定・障害物スポーン）、`actors/rocket/`（RigidBody2D の物理挙動）、`actors/obstacle/`（岩・隕石。Area2D）、`scenes/ui/`（タイトル・クリア・ゲームオーバー）。
+  - **本番シーンは `scenes/copy_main.tscn`**（タイトル・リトライの遷移先）。`scenes/main.tscn` は試作として残っているだけなので、機能追加は copy_main 側へ。ルートは `Node2D`、地面の上面が世界 `y = 0`（高度 0m）で、上へ行くほど `y` は負。
 - **開発 OS は Windows 限定**（Git Bash 前提）。macOS / Linux 向けの分岐は書かない。
 - **複数メンバーが別々のマシン・別々の AI 環境で同時に触る。** 自分の手元だけで通ることより、他人の環境で再現することを優先する。
 
@@ -53,7 +53,7 @@ bash tools/godot.sh verify res://_verify_player.gd
 ## 4. ディレクトリ構成
 
 ```
-scenes/     画面・ステージ（main.tscn ＝ ゲーム本編, background.gd ＝ 背景）
+scenes/     画面・ステージ（copy_main.tscn ＝ ゲーム本編, main.tscn ＝ 旧試作, background.gd ＝ 背景）
               ui/  title.tscn / game_clear.tscn / game_over.tscn
 actors/     再利用する実体。1 機能 1 フォルダで .tscn と .gd を同居させる
               rocket/    プレイヤー（RigidBody2D）
@@ -81,7 +81,7 @@ docs/       このドキュメント群
 
 | 設定 | 値 | 意味 |
 |---|---|---|
-| `run/main_scene` | `res://scenes/main.tscn` | ゲーム本編。差し替えるときはこの設定も合わせる（消すと `Can't run project` で全員が動かせなくなる） |
+| `run/main_scene` | `res://scenes/ui/title.tscn` | 起動はタイトル画面から。本編は `scenes/copy_main.tscn`（タイトル・結果画面の遷移先定数も合わせて直す。消すと `Can't run project` で全員が動かせなくなる） |
 | `[input]` | `thrust`(W) / `rotate_left`(A) / `rotate_right`(D) | 定義済みアクション。追加するときは既存の命名（動詞 `snake_case`）に合わせ、`physical_keycode` で書く |
 | stretch | `canvas_items` / `expand` | 基準ビューポートに対して UI を組む。ウィンドウサイズからピクセル位置を計算しない |
 | 3D physics | Jolt Physics | **2D には効かない。** このゲームは 2D なので実質未使用 |

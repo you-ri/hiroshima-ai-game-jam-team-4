@@ -39,7 +39,7 @@ var _rocket: RigidBody2D
 var _done := {}
 
 func _initialize() -> void:
-	var packed: PackedScene = load("res://scenes/main.tscn")
+	var packed: PackedScene = load("res://scenes/copy_main.tscn")
 	_main = packed.instantiate()
 	root.add_child(_main)          # これを忘れると _ready() も物理も走らない
 	_rocket = _main.get_node("Rocket")

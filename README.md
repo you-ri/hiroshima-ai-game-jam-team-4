@@ -18,7 +18,8 @@ bash tools/godot.sh import    # アセットのインポート
 `path` で見つからないと言われたら [docs/setup.md](docs/setup.md) へ。
 
 > 作っているのは **「アポフィス（Apophis）」— 2D 縦スクロールのロケットクライマー**（射撃なし）。
-> `scenes/main.tscn` がゲーム本編。`bash tools/godot.sh check` が `--- OK: ERROR なし` で終われば環境は正常。
+> 起動はタイトル画面（`scenes/ui/title.tscn`）から。ゲーム本編は `scenes/copy_main.tscn`。
+> `bash tools/godot.sh check` が `--- OK: ERROR なし` で終われば環境は正常。
 
 ## よく使うコマンド
 

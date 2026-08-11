@@ -7,7 +7,7 @@
 | 症状 | 原因 | 対処 |
 |---|---|---|
 | `Godot 本体が見つからない` | パス未登録 | [setup.md](setup.md) の「置き場所を登録する」 |
-| `Can't run project: no main scene defined` | `run/main_scene` が消えた／シーンを差し替えて設定が合っていない | `project.godot` の `[application]` に `run/main_scene="res://scenes/main.tscn"` があるか確認 |
+| `Can't run project: no main scene defined` | `run/main_scene` が消えた／シーンを差し替えて設定が合っていない | `project.godot` の `[application]` に `run/main_scene="res://scenes/ui/title.tscn"` があるか確認 |
 | 出力が途中で切れる / `print()` が出ない | PowerShell から Godot を直接叩いている（GUI ビルドの出力は捕捉できない） | Git Bash で `bash tools/godot.sh ...` を使う |
 | `.ps1` が `Unexpected token` / `missing the terminator` で落ちる | PowerShell 5.1 が BOM 無し UTF-8 の日本語を解析できない | `.ps1` は ASCII のみで書く。説明は `docs/` に日本語で書く |
 | `bash` が見つからない | Git for Windows 未インストール | [setup.md](setup.md) の手順 0 |
