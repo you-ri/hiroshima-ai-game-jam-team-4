@@ -141,12 +141,28 @@ const CROWD_COUNT := 100
 const CROWD_SPAWN_X := Vector2(170.0, 640.0)
 const CROWD_STOP_X := Vector2(112.0, 240.0)
 const CROWD_SPEED := Vector2(30.0, 85.0)
-## 発火が始まる時刻（秒。集まる姿を少し見せてから）と、全員に行き渡るまでの幅（秒）
-const CROWD_BURN_START := 4.0
+## 発火が始まる時刻（秒。開始直後から）と、全員に行き渡るまでの幅（秒）
+const CROWD_BURN_START := 0.0
 const CROWD_BURN_SPAN := 10.0
 ## 燃え尽きるまでの時間（秒）。その後は黒い塊になって残る
 const CROWD_BURN_TIME := 1.1
 const CROWD_SKIN_COLOR := Color(0.85, 0.7, 0.55, 1)
+
+## 大気圏外に浮かぶ宇宙人の攻撃戦艦の艦隊（オチ: 流星は実はこの艦隊の爆撃だった）。
+## 大気圏界面の上の宇宙空間にずらりと並び、下へ向けて爆弾を落とし続けている。
+## ゴールに近づく・大気圏を突破すると初めて視界に入る。当たり判定なしの純粋な演出
+const ARMADA_SEED := 51
+const ARMADA_COUNT := 10
+## 界面（_top_y）からの高さの範囲（手前の列）。奥の列はさらに上に小さく置く
+const ARMADA_OFFSET_Y := Vector2(150.0, 380.0)
+const ARMADA_HULL_COLOR := Color(0.13, 0.11, 0.18, 1)
+const ARMADA_EDGE_COLOR := Color(0.3, 0.26, 0.4, 1)
+## 妖しい発光（宇宙人らしく緑）と、爆弾の色
+const ARMADA_LIGHT_COLOR := Color(0.35, 1.0, 0.5, 1)
+const ARMADA_BOMB_COLOR := Color(1.0, 0.55, 0.2, 1)
+## 爆弾の投下間隔（秒）の範囲と、投下から消えるまでの落下距離（px）
+const ARMADA_BOMB_INTERVAL := Vector2(1.2, 2.6)
+const ARMADA_BOMB_FALL := 620.0
 
 ## 街・山のあちこちで燃える火災（ちらつく光の点。世紀末感の主役）
 const FIRE_SEED := 20290413
@@ -335,6 +351,9 @@ func _draw() -> void:
 
 	# 他国ロケットの脱出と撃墜（大気圏の近く。遠景なので小さく描く）
 	_draw_escape_rockets()
+
+	# 大気圏外の攻撃戦艦の艦隊（流星の正体。界面の上の宇宙空間に並ぶ）
+	_draw_armada()
 
 	# 雲海（ステージ中腹。夜景より手前・壁より奥）
 	_draw_cloud_sea(rng, left, right)
@@ -533,6 +552,67 @@ func _draw_crowd() -> void:
 				var ember := 0.5 + 0.5 * sin(_t * 5.0 + ph)
 				draw_circle(Vector2(x + 1.5, -4.5), 1.2,
 						Color(1.0, 0.4, 0.1, 0.35 * ember))
+
+
+## 大気圏外の宇宙空間に浮かぶ攻撃戦艦の艦隊。ゆっくり上下に揺れながら、
+## 下（地球）へ向けて爆弾を落とし続ける。落ちた爆弾が大気圏に入って流星になる、
+## というオチをゴール到達時に見せる。手前の列は大きく、奥の列は小さく暗く描く
+func _draw_armada() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = ARMADA_SEED
+	for i in ARMADA_COUNT:
+		var far := i % 3 == 2  # 3 隻に 1 隻は奥の列
+		var ship_scale := rng.randf_range(0.5, 0.65) if far else rng.randf_range(0.9, 1.15)
+		var x := rng.randf_range(-_half_width - 200.0, _half_width + 200.0)
+		var base_y := _top_y - rng.randf_range(ARMADA_OFFSET_Y.x, ARMADA_OFFSET_Y.y) \
+				- (180.0 if far else 0.0)
+		var bob_ph := rng.randf_range(0.0, TAU)
+		var pos := Vector2(x, base_y + sin(_t * 0.7 + bob_ph) * 5.0)
+		var dim := 0.55 if far else 1.0
+
+		# 投下される爆弾（船体より奥に描く）。界面をくぐって大気に入り、消える
+		var interval := rng.randf_range(ARMADA_BOMB_INTERVAL.x, ARMADA_BOMB_INTERVAL.y)
+		var bomb_phase := fposmod(_t + rng.randf_range(0.0, interval), interval) / interval
+		var bomb_y := pos.y + 26.0 + ARMADA_BOMB_FALL * bomb_phase * ship_scale
+		var bomb_fade := (1.0 - bomb_phase) * dim
+		draw_line(Vector2(pos.x, bomb_y - 26.0), Vector2(pos.x, bomb_y),
+				Color(ARMADA_BOMB_COLOR.r, ARMADA_BOMB_COLOR.g, ARMADA_BOMB_COLOR.b,
+						0.4 * bomb_fade), 2.0)
+		draw_circle(Vector2(pos.x, bomb_y), 3.2 * ship_scale,
+				Color(1.0, 0.8, 0.45, 0.9 * bomb_fade))
+
+		_draw_armada_ship(pos, ship_scale, dim, i)
+
+
+## 攻撃戦艦 1 隻。横長の艦体 + 上部艦橋 + 緑の発光列 + 下面の投下口の妖しい光
+func _draw_armada_ship(pos: Vector2, ship_scale: float, dim: float, i: int) -> void:
+	draw_set_transform(pos, 0.0, Vector2(ship_scale, ship_scale))
+
+	# 艦体（横長の六角形シルエット）
+	var hull := Color(ARMADA_HULL_COLOR.r, ARMADA_HULL_COLOR.g, ARMADA_HULL_COLOR.b, dim)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(-78.0, 0.0), Vector2(-46.0, -14.0), Vector2(52.0, -14.0),
+		Vector2(78.0, 0.0), Vector2(52.0, 14.0), Vector2(-46.0, 14.0),
+	]), hull)
+	# 上部艦橋と縁のハイライト
+	var edge := Color(ARMADA_EDGE_COLOR.r, ARMADA_EDGE_COLOR.g, ARMADA_EDGE_COLOR.b, dim)
+	draw_rect(Rect2(-14.0, -26.0, 34.0, 14.0), edge)
+	draw_line(Vector2(-78.0, 0.0), Vector2(-46.0, -14.0), edge, 2.0)
+	draw_line(Vector2(-46.0, -14.0), Vector2(52.0, -14.0), edge, 2.0)
+
+	# 舷側の発光列（緑。順に明滅して生き物っぽく）
+	for j in 6:
+		draw_circle(Vector2(-52.0 + j * 20.0, 0.0), 2.6,
+				Color(ARMADA_LIGHT_COLOR.r, ARMADA_LIGHT_COLOR.g, ARMADA_LIGHT_COLOR.b,
+						(0.5 + 0.5 * sin(_t * 3.0 + j - i)) * dim))
+	# 下面の投下口（爆弾が出てくる場所の妖しい光）
+	var pulse := 0.6 + 0.4 * sin(_t * 2.2 + i * 1.4)
+	draw_circle(Vector2(0.0, 16.0), 10.0,
+			Color(ARMADA_BOMB_COLOR.r, ARMADA_BOMB_COLOR.g, ARMADA_BOMB_COLOR.b,
+					0.25 * pulse * dim))
+	draw_circle(Vector2(0.0, 15.0), 4.5, Color(1.0, 0.75, 0.4, 0.7 * pulse * dim))
+
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## 他国のロケット 10 機が視界の下から炎を噴いて登ってくるが、順に隕石に撃ち抜かれて

@@ -7,7 +7,7 @@ extends Control
 ## 背景の描画は Backdrop（space_backdrop.gd）が earth_destroyed / show_rocket = true で持つ。
 
 ## もう一度遊ぶときの遷移先。ゲーム本編。
-const REPLAY_SCENE_PATH := "res://scenes/main.tscn"
+const REPLAY_SCENE_PATH := "res://scenes/copy_main.tscn"
 ## キャンセル時の戻り先。
 const TITLE_SCENE_PATH := "res://scenes/ui/title.tscn"
 

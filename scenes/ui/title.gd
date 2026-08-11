@@ -5,10 +5,8 @@ extends Control
 ## キャンセル（ui_cancel: Escape）で終了する。
 ## 背景の描画は Backdrop（space_backdrop.gd）が持っていて、ここは入力と遷移だけを見る。
 
-## 遷移先。本編ができたらここを差し替える。
-## project.godot の run/main_scene は res://scenes/main.tscn のままなので、
-## タイトル単体で見るときは: bash tools/godot.sh run scenes/ui/title.tscn
-const GAME_SCENE_PATH := "res://scenes/main.tscn"
+## 遷移先。本編は copy_main.tscn（main.tscn は試作として残してある）
+const GAME_SCENE_PATH := "res://scenes/copy_main.tscn"
 
 ## PRESS ... の明滅周期（秒）
 const BLINK_PERIOD := 1.4
