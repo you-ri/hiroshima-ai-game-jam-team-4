@@ -17,55 +17,69 @@ const BUILDING_COLOR := Color(0.055, 0.065, 0.12, 1)
 const WINDOW_COLOR := Color(1.0, 0.8, 0.45, 0.8)
 const CITY_GLOW_COLOR := Color(0.45, 0.3, 0.45, 0.05)
 
-## 雲海（ステージ中腹。登っている実感を出すための通過目標）
+## 雲海（ステージ中腹。登っている実感を出すための通過目標）。
+## 上空のアポフィスを覆い隠す「幕」の役割もあるため、帯を厚く・濃くしてある。
+## 抜けた先で初めてアポフィスが見えるのが演出の肝（main.gd の常時微振動もここが起点）。
 ## 高度は m 単位で持ち、px へは Units で変換する（Spec の 3000m ＝ 6 画面と揃える）
 const CLOUD_LAYERS: Array[Dictionary] = [
 	# 奥ほど高く・暗く・小さい。手前ほど低く・明るく・大きい
-	{"altitude_m": 1180.0, "radius": Vector2(38.0, 72.0), "step": Vector2(48.0, 96.0),
-			"spread": 26.0, "color": Color(0.32, 0.36, 0.5, 0.32)},
-	{"altitude_m": 1100.0, "radius": Vector2(52.0, 98.0), "step": Vector2(64.0, 124.0),
-			"spread": 34.0, "color": Color(0.46, 0.5, 0.64, 0.4)},
-	{"altitude_m": 1020.0, "radius": Vector2(64.0, 124.0), "step": Vector2(78.0, 150.0),
-			"spread": 42.0, "color": Color(0.62, 0.66, 0.8, 0.46)},
+	{"altitude_m": 1300.0, "radius": Vector2(34.0, 64.0), "step": Vector2(40.0, 78.0),
+			"spread": 24.0, "color": Color(0.26, 0.3, 0.44, 0.5)},
+	{"altitude_m": 1240.0, "radius": Vector2(42.0, 80.0), "step": Vector2(44.0, 86.0),
+			"spread": 28.0, "color": Color(0.32, 0.36, 0.5, 0.62)},
+	{"altitude_m": 1180.0, "radius": Vector2(50.0, 92.0), "step": Vector2(48.0, 92.0),
+			"spread": 32.0, "color": Color(0.38, 0.42, 0.56, 0.72)},
+	{"altitude_m": 1110.0, "radius": Vector2(58.0, 106.0), "step": Vector2(56.0, 104.0),
+			"spread": 36.0, "color": Color(0.46, 0.5, 0.64, 0.8)},
+	{"altitude_m": 1040.0, "radius": Vector2(66.0, 120.0), "step": Vector2(64.0, 118.0),
+			"spread": 40.0, "color": Color(0.54, 0.58, 0.72, 0.86)},
+	{"altitude_m": 970.0, "radius": Vector2(72.0, 132.0), "step": Vector2(72.0, 132.0),
+			"spread": 44.0, "color": Color(0.62, 0.66, 0.8, 0.9)},
 ]
 ## 雲海全体をぼんやり照らす帯（月明かりが雲に反射している感じ）
 const CLOUD_GLOW_COLOR := Color(0.35, 0.4, 0.58, 0.05)
 
-## 大気圏界面（＝ゴール。ステージ最上部 _top_y）。ここを抜けると main.gd が自動上昇に入る。
-## 「どこがゴールか」を一目で分かるようにするための表示なので、線・矢印・文字をまとめて描く
-const ATMO_LINE_COLOR := Color(0.4, 0.95, 1.0, 1)
+## 巨大隕石アポフィス（雲海の向こう側に浮かぶ背景オブジェクト。移動しない）。
+## 下端を雲海の帯に沈めて手前の雲に隠させることで「雲より遠くにある」遠近感を出す。
+## 当たり判定は無い（純粋な見た目）
+const APOPHIS_ALTITUDE_M := 1550.0
+const APOPHIS_CENTER_X := 140.0
+const APOPHIS_RADIUS := 460.0
+const APOPHIS_ROCK_COLOR := Color(0.11, 0.09, 0.1, 1)
+const APOPHIS_LIT_COLOR := Color(0.24, 0.17, 0.15, 1)
+const APOPHIS_CRATER_COLOR := Color(0.07, 0.055, 0.07, 1)
+## 不吉さを出す赤いハロー（大気越しに照り返している感じ）
+const APOPHIS_GLOW_COLOR := Color(0.9, 0.25, 0.1, 1)
+
+## 大気圏の上端（＝ゴール。ステージ最上部 _top_y）。ここを抜けると main.gd が自動上昇に入る。
+## 軌道から見た大気光（airglow）のような、淡く発光する帯として絵的に描く
+const AIRGLOW_COLOR := Color(0.45, 0.9, 0.8, 1)
+## 大気光が界面の下に溜まる帯の厚さと分割数（多いほど滑らかなグラデーション）
+const AIRGLOW_HEIGHT := 170.0
+const AIRGLOW_BANDS := 14
 ## 境界の下に敷く大気のかすみ。下（地上側）ほど濃く、境界に近づくほど薄れて宇宙になる
 const ATMO_HAZE_COLOR := Color(0.22, 0.55, 0.95, 1)
 const ATMO_HAZE_HEIGHT := 1100.0
 const ATMO_HAZE_BANDS := 10
 const ATMO_HAZE_MAX_ALPHA := 0.1
-## 境界のラベル用フォント（main.tscn の UI と同じ指定。日本語グリフのあるものを優先）
-const LABEL_FONT_NAMES: Array[String] = ["Yu Gothic UI", "Meiryo UI", "MS UI Gothic", "Segoe UI"]
 
 var _top_y := 0.0
 var _bottom_y := 0.0
 var _half_width := 640.0
 var _screen_sep := 720.0
 var _grid_step := 64.0
-## 境界のラベルに出すゴール高度（m）。px から逆算すると端数が出るので main.gd から受け取る
-var _goal_altitude_m := 0.0
-var _label_font: SystemFont
 
 
 func _ready() -> void:
 	# main.tscn のツリー順では Rocket より後ろ（＝手前）に来るため、必ず奥に描く
 	z_index = -10
-	_label_font = SystemFont.new()
-	_label_font.font_names = PackedStringArray(LABEL_FONT_NAMES)
 
 
-func setup(top_y: float, bottom_y: float, half_width: float, screen_sep: float,
-		goal_altitude_m: float) -> void:
+func setup(top_y: float, bottom_y: float, half_width: float, screen_sep: float) -> void:
 	_top_y = top_y
 	_bottom_y = bottom_y
 	_half_width = half_width
 	_screen_sep = screen_sep
-	_goal_altitude_m = goal_altitude_m
 	queue_redraw()
 
 
@@ -101,6 +115,9 @@ func _draw() -> void:
 
 	# 地上の夜景（遠景の山 → 街明かり → 近景の山の順で奥から重ねる）
 	_draw_night_scenery(rng, left, right)
+
+	# アポフィス（雲海より奥＝先に描く。下から登る間は雲海が幕になって見えない）
+	_draw_apophis(rng)
 
 	# 雲海（ステージ中腹。夜景より手前・壁より奥）
 	_draw_cloud_sea(rng, left, right)
@@ -168,6 +185,42 @@ func _draw_cloud_sea(rng: RandomNumberGenerator, left: float, right: float) -> v
 			x += rng.randf_range(step.x, step.y)
 
 
+## 雲海の上空に浮かぶ巨大隕石アポフィス。背景の一部なので動かない。
+## 街明かりの照り返し（下面の赤）＋月明かり（上面の微光）＋クレーターで立体感を出す
+func _draw_apophis(rng: RandomNumberGenerator) -> void:
+	var center := Vector2(APOPHIS_CENTER_X, -Units.m_to_px(APOPHIS_ALTITUDE_M))
+
+	# 赤いハロー（外ほど薄い 3 重円）
+	for i in 3:
+		var t := float(i) / 3.0
+		draw_circle(center, APOPHIS_RADIUS * (1.35 - t * 0.11),
+				Color(APOPHIS_GLOW_COLOR.r, APOPHIS_GLOW_COLOR.g, APOPHIS_GLOW_COLOR.b,
+						0.03 + t * 0.02))
+
+	# 岩体。ベース → 下側の照り返し → 本体の順に重ねて球っぽく見せる
+	draw_circle(center, APOPHIS_RADIUS, APOPHIS_LIT_COLOR)
+	draw_circle(center + Vector2(-APOPHIS_RADIUS * 0.08, -APOPHIS_RADIUS * 0.1),
+			APOPHIS_RADIUS * 0.94, APOPHIS_ROCK_COLOR)
+
+	# クレーター（本体の内側に収まる範囲だけ。固定シード rng で決定的に配置）
+	for _i in 26:
+		var a := rng.randf_range(0.0, TAU)
+		var d := rng.randf_range(0.0, APOPHIS_RADIUS * 0.78)
+		var r := rng.randf_range(14.0, 64.0)
+		var p := center + Vector2(cos(a), sin(a)) * d
+		draw_circle(p, r, APOPHIS_CRATER_COLOR)
+		# 縁の照り返し（下側だけ細く明るく）
+		draw_arc(p, r, TAU * 0.1, TAU * 0.4, 10,
+				Color(0.3, 0.2, 0.17, 0.5), 2.0)
+
+	# 下弦の赤いリムライト（地上の火災・街明かりの照り返し）
+	draw_arc(center, APOPHIS_RADIUS * 0.99, TAU * 0.08, TAU * 0.42, 40,
+			Color(APOPHIS_GLOW_COLOR.r, APOPHIS_GLOW_COLOR.g, APOPHIS_GLOW_COLOR.b, 0.5), 5.0)
+
+	# 大気越しのかすみ（空の色を薄く被せて彩度とコントラストを落とし、遠くに見せる）
+	draw_circle(center, APOPHIS_RADIUS * 1.02, Color(0.05, 0.07, 0.12, 0.28))
+
+
 ## 境界（_top_y）の下に敷く大気の層。下ほど濃く、境界に近づくほど薄くして
 ## 「ここから上には空気が無い」と見て分かるようにする
 func _draw_atmosphere_haze(left: float, right: float) -> void:
@@ -178,50 +231,27 @@ func _draw_atmosphere_haze(left: float, right: float) -> void:
 		draw_rect(Rect2(left, _top_y + band * i, right - left, band), color)
 
 
-## 大気圏界面そのもの。発光する線 + 上向き矢印 + ラベルで「ここがゴール」と示す。
-## 線を越えた後の挙動（自動上昇 → 画面外でクリア）は scenes/main.gd 側。
+## 大気圏の上端。軌道写真で見える大気光（airglow）のイメージで、
+## 界面のすぐ下に淡い光が溜まり、その上はすっと宇宙の黒に抜ける。
+## 文字や記号は置かず、絵として「ここで空気が終わる」と分からせる。
+## 越えた後の挙動（自動上昇 → 画面外でクリア）は scenes/main.gd 側。
 func _draw_atmosphere_edge() -> void:
 	var x0 := -_half_width
 	var x1 := _half_width
-	var glow := Color(ATMO_LINE_COLOR.r, ATMO_LINE_COLOR.g, ATMO_LINE_COLOR.b, 0.1)
 
-	# 太い半透明の線を重ねて発光させる
-	for i in 3:
-		draw_line(Vector2(x0, _top_y), Vector2(x1, _top_y), glow, 30.0 - i * 9.0)
-	draw_line(Vector2(x0, _top_y), Vector2(x1, _top_y), ATMO_LINE_COLOR, 4.0)
+	# 界面の下に溜まる大気光。界面側が最も明るく、下へ二乗で減衰させる
+	var band := AIRGLOW_HEIGHT / float(AIRGLOW_BANDS)
+	for i in AIRGLOW_BANDS:
+		var t := float(i) / float(AIRGLOW_BANDS)
+		# 界面付近は緑がかった大気光、下に行くほど大気のかすみの青に馴染ませる
+		var color := AIRGLOW_COLOR.lerp(ATMO_HAZE_COLOR, t)
+		color.a = 0.22 * (1.0 - t) * (1.0 - t)
+		draw_rect(Rect2(x0, _top_y + band * i, x1 - x0, band + 1.0), color)
 
-	# 境界の少し下に破線（ゲートらしく見せる）
-	var dash := Color(ATMO_LINE_COLOR.r, ATMO_LINE_COLOR.g, ATMO_LINE_COLOR.b, 0.45)
-	var x := x0
-	while x < x1:
-		draw_line(Vector2(x, _top_y + 16.0), Vector2(minf(x + 34.0, x1), _top_y + 16.0), dash, 2.0)
-		x += 68.0
-
-	# 上向きの矢印（抜ける方向）
-	var arrow := Color(ATMO_LINE_COLOR.r, ATMO_LINE_COLOR.g, ATMO_LINE_COLOR.b, 0.3)
-	var cx := x0 + 80.0
-	while cx <= x1 - 80.0:
-		draw_colored_polygon(PackedVector2Array([
-			Vector2(cx, _top_y - 46.0),
-			Vector2(cx - 14.0, _top_y - 22.0),
-			Vector2(cx + 14.0, _top_y - 22.0),
-		]), arrow)
-		cx += 160.0
-
-	# ラベル（境界の上＝宇宙側と、下＝大気側の 2 行）
-	_draw_label(Vector2(x0, _top_y - 74.0), "大 気 圏 外", 44,
-			Color(0.75, 0.98, 1.0, 0.95))
-	_draw_label(Vector2(x0, _top_y + 56.0),
-			"大気圏界面 %d m ─ 突破すると自動で上昇し、画面外に出てクリア" % int(_goal_altitude_m),
-			24, Color(0.6, 0.92, 1.0, 0.85))
-
-
-## ステージ幅いっぱいに中央揃えで文字を描く（読みやすさのため黒フチ付き）
-func _draw_label(pos: Vector2, text: String, size: int, color: Color) -> void:
-	var width := _half_width * 2.0
-	draw_string_outline(_label_font, pos, text, HORIZONTAL_ALIGNMENT_CENTER, width, size,
-			8, Color(0, 0, 0, 0.85))
-	draw_string(_label_font, pos, text, HORIZONTAL_ALIGNMENT_CENTER, width, size, color)
+	# 界面そのものは細い光の芯。にじみ（幅広・低アルファ）を重ねてぼんやり光らせる
+	for width_alpha in [[22.0, 0.05], [10.0, 0.1], [4.0, 0.22]]:
+		var c := Color(AIRGLOW_COLOR.r, AIRGLOW_COLOR.g, AIRGLOW_COLOR.b, width_alpha[1])
+		draw_line(Vector2(x0, _top_y), Vector2(x1, _top_y), c, width_alpha[0])
 
 
 ## 稜線をランダムに折りながら left→right へ走らせ、地面より下（+60）で閉じる

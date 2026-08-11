@@ -64,6 +64,13 @@ const RESPAWN_DELAY := 1.0
 const SHAKE_STRENGTH := 14.0
 const SHAKE_DECAY := 30.0
 
+## 雲海（背景の CLOUD_LAYERS 最上段 1300m）を抜けるとアポフィスが視界に入り、
+## その圧で画面が常時細かく振動する。この高度からフェード幅をかけて最大になる
+const APOPHIS_RUMBLE_START_ALTITUDE_M := 1350.0
+const APOPHIS_RUMBLE_FADE_M := 250.0
+## 常時振動の最大振幅（px）。被弾シェイクより明確に弱く、HUD が読める範囲に抑える
+const APOPHIS_RUMBLE_STRENGTH := 3.0
+
 @onready var _rocket: Rocket = $Rocket
 @onready var _camera: Camera2D = $Camera2D
 @onready var _background: Node2D = $Background
@@ -104,7 +111,7 @@ func _ready() -> void:
 
 	_build_walls()
 	_build_ground()
-	_background.setup(goal_y, GROUND_Y, HALF_STAGE_WIDTH, DESIGN_HEIGHT, GOAL_ALTITUDE_M)
+	_background.setup(goal_y, GROUND_Y, HALF_STAGE_WIDTH, DESIGN_HEIGHT)
 
 	_alt_bar.position = Vector2(DESIGN_WIDTH - 56.0, 40.0)
 	_alt_bar.size = Vector2(32.0, DESIGN_HEIGHT - 80.0)
@@ -164,8 +171,14 @@ func _process(delta: float) -> void:
 	if _shake > 0.0:
 		offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake
 		_shake = maxf(_shake - SHAKE_DECAY * delta, 0.0)
+	# アポフィスの圧による常時微振動（雲海を抜けた高度からフェードイン。降りると消える）
+	var rumble := clampf((_altitude_m() - APOPHIS_RUMBLE_START_ALTITUDE_M)
+			/ APOPHIS_RUMBLE_FADE_M, 0.0, 1.0) * APOPHIS_RUMBLE_STRENGTH
+	if rumble > 0.0:
+		offset += Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * rumble
 	if _camera_locked:
-		_camera.global_position = _camera_locked_pos
+		# 大気圏突破の演出中もアポフィスは居るので、固定位置の上に微振動だけ乗せる
+		_camera.global_position = _camera_locked_pos + offset
 	else:
 		_camera.global_position = _rocket.global_position + offset
 	_update_hud()
