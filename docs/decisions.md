@@ -37,4 +37,16 @@
 - 理由: `run/main_scene` が未設定だと誰も `check` を通せず、環境構築の成否が判定できない。ジャンル未定のためルートは中立な `Node`（2D/3D どちらにも寄せられる）とし、UI は `CanvasLayer` 配下に置いた。日本語表示の確認を兼ねてラベルに `SystemFont` を指定している。
 - 影響: 差し替え前提のプレースホルダ。作り込むときは `project.godot` の `run/main_scene` との整合を保つこと。ルートを 2D/3D どちらにするかは未決定。
 
+## 2026-08-11 タイトル画面を `scenes/ui/title.tscn` に作った（`run/main_scene` は据え置き）
+- 理由: ゲーム名は「Apophis」（隕石をよけて地球を脱出する）。UI は 2D の `Control` ルートなので、本編を 3D にしてもタイトル側は影響を受けない。`run/main_scene` は `res://scenes/main.tscn` のままにしてある（起動シーンを動かすと本編担当の作業とぶつかるため）。
+- 影響: `scenes/main.tscn` と `main.gd` は未変更。タイトル単体で見るときは `bash tools/godot.sh run scenes/ui/title.tscn`。起動シーンをタイトルに切り替えるかどうかは本編の形が決まってから判断する。決定入力での遷移先は `title.gd` の `GAME_SCENE_PATH`（現在 `res://scenes/main.tscn`）。
+
+## 2026-08-11 タイトル背景は画像を使わず `_draw()` の図形描画で作った
+- 理由: `assets/art/` がまだ空で、ジャム中にアセットの取り合いをしたくない。星・地球・小惑星は図形で十分それらしくなり、`.tscn` に画像の ext_resource が増えないので衝突もしない。乱数は固定シード（`RNG_SEED = 20290413`）なので毎回同じ絵が出る。
+- 影響: 差し替えるなら `scenes/ui/space_backdrop.gd` を丸ごと置き換える。ヘッドレスの dummy レンダラでは `_draw()` の結果を確認できないので、見た目を変えたら実レンダラで描かせて確認する（[workflow.md](workflow.md) の「見た目の確認」）。
+
+## 2026-08-11 決定入力は `ui_accept` / `ui_cancel` をそのまま使う
+- 理由: 既定で Space / Enter / Escape が入っており、タイトルだけのために `[input]` を増やすと本編の入力設計と先に衝突する。
+- 影響: 本編の移動キー（WASD 等）を決める人が `[input]` を新設する。タイトルは触らなくてよい。
+
 <!-- 以降、決定したことを追記していく -->
