@@ -77,11 +77,20 @@ const SHOWER_COLOR := Color(1.0, 0.62, 0.3, 1)
 ## 着弾爆発の長さ（秒）と半径の範囲
 const SHOWER_EXPLOSION_TIME := 0.7
 const SHOWER_EXPLOSION_RADIUS := Vector2(26.0, 72.0)
+## 低空では流星を間引く。地上では 1/4、この高度（雲海の下端）で全数になる
+const SHOWER_MIN_FRACTION := 0.25
+const SHOWER_FULL_ALTITUDE_M := 950.0
+## 群衆を焼く弾の着弾 x。走路の途中 2 箇所 + 右側の集合地点の縁 1 箇所。
+## 密集の中心に置くと数秒で全滅するため「たまに巻き込まれる」位置を選んである。
+## 対象の弾は「地上でも有効な先頭 1/4 のうち、落下周期が長いもの」から充てる
+## （周期の短い弾に割り当てると 1 秒間隔の連射になり、通り道の全員が焼けてしまう）
+const SHOWER_BURN_TARGET_XS: Array[float] = [-520.0, 205.0, 380.0]
 
-## 雲海の直前の高度を飛ぶ旅客機（一度きりの演出）。カメラが TRIGGER 高度を超えると
-## 右から現れ、数秒飛んだところで被弾して爆発し、火を噴きながら墜落する。当たり判定なし
-const PLANE_TRIGGER_ALTITUDE_M := 760.0
-const PLANE_ALTITUDE_M := 880.0
+## 雲海の中の高度を飛ぶ旅客機（一度きりの演出）。カメラが TRIGGER 高度を超えると
+## 右から現れ、数秒飛んだところで被弾して爆発し、火を噴きながら墜落する。当たり判定なし。
+## 暗い空が背景だと機体が見えないため、明るい雲海（970〜1300m）を背にして飛ばす
+const PLANE_TRIGGER_ALTITUDE_M := 1000.0
+const PLANE_ALTITUDE_M := 1150.0
 ## 出現から爆発までの飛行時間（秒）と速度（px/s）
 const PLANE_FLY_TIME := 2.6
 const PLANE_SPEED := 470.0
@@ -105,6 +114,47 @@ const MISSILE_EXPLOSION_RADIUS := Vector2(26.0, 48.0)
 ## 次弾までの休止（秒）の範囲（全弾同時発射にならないよう周期をずらす）
 const MISSILE_PAUSE := Vector2(0.4, 1.6)
 
+## 大気圏の近くで、他国のロケットも同じように脱出を試みている演出（一度きり）。
+## カメラが TRIGGER 高度を超えると視界の下から 10 機が登ってくるが、
+## 7 秒ほどの間に隕石に撃ち抜かれて全機墜ちる（＝生きて抜けるのはプレイヤーだけ）
+const ESCAPE_TRIGGER_ALTITUDE_M := 2300.0
+## 各機のパラメータ: offset = 開始時のカメラ中央からの相対位置（+y は画面下）、
+## speed = 上昇速度（px/s）、doom = 撃墜される時刻（秒）、scale = 遠近感の倍率
+## （scale が小さい＝遠い機ほど遅く見えるよう speed も下げる）
+const ESCAPE_ROCKETS: Array[Dictionary] = [
+	{"offset": Vector2(-600.0, 420.0), "speed": 150.0, "doom": 1.8, "scale": 0.45},
+	{"offset": Vector2(-430.0, 380.0), "speed": 190.0, "doom": 2.4, "scale": 0.62},
+	{"offset": Vector2(-260.0, 560.0), "speed": 210.0, "doom": 3.0, "scale": 0.70},
+	{"offset": Vector2(-90.0, 340.0), "speed": 165.0, "doom": 3.4, "scale": 0.50},
+	{"offset": Vector2(150.0, 520.0), "speed": 230.0, "doom": 3.9, "scale": 0.78},
+	{"offset": Vector2(320.0, 660.0), "speed": 245.0, "doom": 4.4, "scale": 0.85},
+	{"offset": Vector2(430.0, 300.0), "speed": 165.0, "doom": 5.0, "scale": 0.52},
+	{"offset": Vector2(590.0, 480.0), "speed": 175.0, "doom": 5.5, "scale": 0.58},
+	{"offset": Vector2(-520.0, 700.0), "speed": 200.0, "doom": 6.1, "scale": 0.66},
+	{"offset": Vector2(40.0, 780.0), "speed": 255.0, "doom": 6.8, "scale": 0.88},
+]
+const ESCAPE_EXPLOSION_TIME := 0.5
+## 撃墜後、残骸が燃えながら落ちて消えるまでの時間（秒）
+const ESCAPE_DEBRIS_TIME := 1.8
+const ESCAPE_BODY_COLOR := Color(0.72, 0.75, 0.84, 1)
+
+## スタート地点の発射台へ、助けを求めて走り寄ってくる群衆（純粋な演出）。
+## ロケットの機体がぶつかる・噴射炎が当たる・落下してくる流星の爆発に巻き込まれる、
+## のいずれかで焼かれてしまう。残機・スコア等のゲームプレイには一切影響しない
+const CROWD_SEED := 4444
+const CROWD_COUNT := 100
+## 出現位置と、集まって立ち止まる位置（発射台の縁）の x 距離範囲
+const CROWD_SPAWN_X := Vector2(170.0, 640.0)
+const CROWD_STOP_X := Vector2(112.0, 240.0)
+const CROWD_SPEED := Vector2(30.0, 85.0)
+## 機体との接触・噴射炎との接触とみなす距離（px）。炎は Flame ポリゴンの中心付近で判定
+const CROWD_BUMP_RADIUS := 44.0
+const CROWD_FLAME_RADIUS := 52.0
+const CROWD_FLAME_OFFSET := 82.0
+## 燃え尽きるまでの時間（秒）。その後は黒い塊になって残る
+const CROWD_BURN_TIME := 1.1
+const CROWD_SKIN_COLOR := Color(0.85, 0.7, 0.55, 1)
+
 ## 街・山のあちこちで燃える火災（ちらつく光の点。世紀末感の主役）
 const FIRE_SEED := 20290413
 const FIRE_COUNT := 34
@@ -125,26 +175,117 @@ var _plane_started := false
 var _plane_t := 0.0
 ## 被弾させる x 座標。開始時のカメラ中央を記録し、プレイヤーの目の前で爆発させる
 var _plane_boom_x := 0.0
+## 他国ロケットの脱出演出。開始時のカメラ中央を基準に相対配置する
+var _escape_started := false
+var _escape_t := 0.0
+var _escape_origin := Vector2.ZERO
+## 群衆。1 人 1 Dictionary（x=現在位置, stop=目標位置, state: 0=走る 1=燃焼中 2=焼死体）
+var _crowd: Array[Dictionary] = []
+## 流星群の各弾のパラメータ（固定シードから setup() で一度だけ生成）。
+## 描画と、群衆への着弾判定の両方が同じ値を参照する
+var _shower_cache: Array[Dictionary] = []
 
 
 func _ready() -> void:
 	# main.tscn のツリー順では Rocket より後ろ（＝手前）に来るため、必ず奥に描く
 	z_index = -10
+	_init_crowd()
+
+
+## 群衆を発射台の左右に散らして生成する（固定シードで決定的）
+func _init_crowd() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = CROWD_SEED
+	for i in CROWD_COUNT:
+		var side := -1.0 if i % 2 == 0 else 1.0
+		_crowd.append({
+			"x": side * rng.randf_range(CROWD_SPAWN_X.x, CROWD_SPAWN_X.y),
+			"stop": side * rng.randf_range(CROWD_STOP_X.x, CROWD_STOP_X.y),
+			"speed": rng.randf_range(CROWD_SPEED.x, CROWD_SPEED.y),
+			"ph": rng.randf_range(0.0, TAU),
+			"h": rng.randf_range(14.0, 20.0),
+			"shirt": Color(rng.randf_range(0.25, 0.55), rng.randf_range(0.2, 0.45),
+					rng.randf_range(0.2, 0.5), 1.0),
+			"state": 0,
+			"burn": 0.0,
+		})
 
 
 func _process(delta: float) -> void:
 	_t += delta
+	var camera := get_viewport().get_camera_2d()
+
 	if _plane_started:
 		_plane_t += delta
-	else:
+	elif camera != null \
+			and camera.global_position.y <= -Units.m_to_px(PLANE_TRIGGER_ALTITUDE_M):
 		# プレイヤー（＝カメラ）が雲海の少し下まで登ってきたら旅客機の演出を始める
-		var camera := get_viewport().get_camera_2d()
-		if camera != null \
-				and camera.global_position.y <= -Units.m_to_px(PLANE_TRIGGER_ALTITUDE_M):
-			_plane_started = true
-			# 画面の真ん中あたりで被弾するよう、この時点のカメラ中央 x を狙い点にする
-			_plane_boom_x = camera.global_position.x
+		_plane_started = true
+		# 画面の真ん中あたりで被弾するよう、この時点のカメラ中央 x を狙い点にする
+		_plane_boom_x = camera.global_position.x
+
+	if _escape_started:
+		_escape_t += delta
+	elif camera != null \
+			and camera.global_position.y <= -Units.m_to_px(ESCAPE_TRIGGER_ALTITUDE_M):
+		# 大気圏が近づいたら、他国のロケットも脱出を試みる演出を始める
+		_escape_started = true
+		_escape_origin = camera.global_position
+
+	_update_crowd(delta)
 	queue_redraw()
+
+
+## 群衆の移動と、ロケット本体・噴射炎との接触判定。
+## ロケットは "player" グループから探す（見つからないフレームは移動だけ行う）
+func _update_crowd(delta: float) -> void:
+	var rocket := get_tree().get_first_node_in_group("player") as Node2D
+	var rocket_pos := Vector2.ZERO
+	var flame_pos := Vector2.ZERO
+	var flame_on := false
+	if rocket != null and rocket.visible:
+		rocket_pos = rocket.global_position
+		var flame := rocket.get_node_or_null("Flame") as Node2D
+		flame_on = flame != null and flame.visible
+		# Flame ポリゴン（local y=46〜118）の中心あたりを炎の当たり位置とする
+		flame_pos = rocket_pos + Vector2(0.0, CROWD_FLAME_OFFSET).rotated(rocket.rotation)
+
+	# いま爆発中の流星（有効数の中の、群衆を焼く弾のみ）の着弾点を集める
+	var impacts: Array[Vector2] = []
+	var impact_radii: Array[float] = []
+	for i in _shower_active_count():
+		var m := _shower_cache[i]
+		if not (m["burns"] as bool):
+			continue
+		var phase := fposmod(_t + (m["phase_off"] as float), m["cycle"] as float)
+		if phase >= (m["fall_time"] as float):
+			impacts.append(m["impact"])
+			# 見た目の爆発より狭い「直撃圏」だけ焼く（見た目どおりだと一撃で焼けすぎる）
+			impact_radii.append((m["boom_r"] as float) * 0.5)
+
+	for p in _crowd:
+		match p["state"]:
+			0:
+				# 発射台の縁へ走り寄る
+				var dx: float = p["stop"] - p["x"]
+				if absf(dx) > 2.0:
+					p["x"] += signf(dx) * (p["speed"] as float) * delta
+				var pos := Vector2(p["x"], -(p["h"] as float) * 0.5)
+				# 機体か炎に触れたら燃え始める
+				if rocket != null and rocket.visible \
+						and (pos.distance_to(rocket_pos) < CROWD_BUMP_RADIUS \
+						or (flame_on and pos.distance_to(flame_pos) < CROWD_FLAME_RADIUS)):
+					p["state"] = 1
+					continue
+				# 流星の着弾爆発に巻き込まれても燃える
+				for i in impacts.size():
+					if pos.distance_to(impacts[i]) < impact_radii[i]:
+						p["state"] = 1
+						break
+			1:
+				p["burn"] = (p["burn"] as float) + delta
+				if p["burn"] >= CROWD_BURN_TIME:
+					p["state"] = 2
 
 
 func setup(top_y: float, bottom_y: float, half_width: float, screen_sep: float) -> void:
@@ -152,7 +293,58 @@ func setup(top_y: float, bottom_y: float, half_width: float, screen_sep: float) 
 	_bottom_y = bottom_y
 	_half_width = half_width
 	_screen_sep = screen_sep
+	_build_shower_cache()
 	queue_redraw()
+
+
+## 流星群のパラメータを固定シードで生成する。ステージ範囲に依存するため setup() で呼ぶ
+func _build_shower_cache() -> void:
+	_shower_cache.clear()
+	var left := -_half_width - MARGIN_X
+	var right := _half_width + MARGIN_X
+	var top := _top_y - MARGIN_Y
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SHOWER_SEED
+	for i in SHOWER_COUNT:
+		var start := Vector2(rng.randf_range(left, right), rng.randf_range(top, -250.0))
+		var speed := rng.randf_range(SHOWER_SPEED.x, SHOWER_SPEED.y)
+		var dir := Vector2(-rng.randf_range(SHOWER_DRIFT.x, SHOWER_DRIFT.y), 1.0).normalized()
+		# 開始位置から地面（y=0）までの落下時間 + 爆発時間で 1 周期
+		var fall_time := (0.0 - start.y) / dir.y / speed
+		var cycle := fall_time + SHOWER_EXPLOSION_TIME
+		_shower_cache.append({
+			"start": start,
+			"speed": speed,
+			"dir": dir,
+			"length": rng.randf_range(SHOWER_LENGTH.x, SHOWER_LENGTH.y),
+			"alpha": rng.randf_range(0.25, 0.6),
+			"boom_r": rng.randf_range(SHOWER_EXPLOSION_RADIUS.x, SHOWER_EXPLOSION_RADIUS.y),
+			"fall_time": fall_time,
+			"cycle": cycle,
+			"phase_off": rng.randf_range(0.0, cycle),
+			"impact": start + dir * speed * fall_time + Vector2(0.0, -4.0),
+			"burns": false,
+		})
+	_assign_burn_meteors()
+
+
+## 群衆を焼く弾を選んで着弾点を差し替える。地上でも有効な先頭 1/4 のうち
+## 落下周期が長い順に SHOWER_BURN_TARGET_XS の x へ着弾させる
+func _assign_burn_meteors() -> void:
+	var ground_active := int(ceil(_shower_cache.size() * SHOWER_MIN_FRACTION))
+	var order := range(ground_active)
+	order.sort_custom(func(a: int, b: int) -> bool:
+		return (_shower_cache[a]["fall_time"] as float) > (_shower_cache[b]["fall_time"] as float))
+	for j in SHOWER_BURN_TARGET_XS.size():
+		var m := _shower_cache[order[j]]
+		var target_x := SHOWER_BURN_TARGET_XS[j]
+		# 指定 x に着弾するよう開始位置を逆算して差し替える
+		var start: Vector2 = m["start"]
+		start.x = target_x - (m["dir"] as Vector2).x * (m["speed"] as float) \
+				* (m["fall_time"] as float)
+		m["start"] = start
+		m["impact"] = Vector2(target_x, -4.0)
+		m["burns"] = true
 
 
 func _draw() -> void:
@@ -191,6 +383,9 @@ func _draw() -> void:
 	# 各所の火災（山・ビルの上に乗せてちらつかせる）
 	_draw_fires(left, right)
 
+	# 発射台へ集まる群衆（地面の上。夜景・火災より手前）
+	_draw_crowd()
+
 	# アポフィス（雲海より奥＝先に描く。下から登る間は雲海が幕になって見えない）
 	_draw_apophis(rng)
 
@@ -198,13 +393,16 @@ func _draw() -> void:
 	_draw_missiles()
 
 	# 落下する隕石群（山・街・アポフィスより手前、雲海より奥）
-	_draw_meteor_shower(left, right, top)
+	_draw_meteor_shower()
 
-	# 旅客機の被弾・墜落（隕石群と同じレイヤー感。雲海より奥）
-	_draw_plane()
+	# 他国ロケットの脱出と撃墜（大気圏の近く。遠景なので小さく描く）
+	_draw_escape_rockets()
 
 	# 雲海（ステージ中腹。夜景より手前・壁より奥）
 	_draw_cloud_sea(rng, left, right)
+
+	# 旅客機の被弾・墜落（明るい雲海を背にシルエットが見えるよう、雲より手前に描く）
+	_draw_plane()
 
 	# 大気のかすみ（境界の下側。ここから上が宇宙だと分かるように薄れていく）
 	_draw_atmosphere_haze(left, right)
@@ -269,37 +467,38 @@ func _draw_cloud_sea(rng: RandomNumberGenerator, left: float, right: float) -> v
 			x += rng.randf_range(step.x, step.y)
 
 
+## いま有効な流星の数。低空では 1/4 に間引き、雲海へ近づくほど増やして全数にする。
+## キャッシュの並びは空間的にランダムなので、先頭 n 個を取れば自然に散る
+func _shower_active_count() -> int:
+	var camera := get_viewport().get_camera_2d()
+	var altitude := 0.0
+	if camera != null:
+		altitude = maxf(Units.px_to_m(-camera.global_position.y), 0.0)
+	var fraction := lerpf(SHOWER_MIN_FRACTION, 1.0,
+			clampf(altitude / SHOWER_FULL_ALTITUDE_M, 0.0, 1.0))
+	return int(ceil(_shower_cache.size() * fraction))
+
+
 ## 落下する無数の小さな隕石。各隕石は「空から落ちる → 地面（y=0）で爆発 → 再落下」を
-## 独自の周期でループする。パラメータは固定シードで決定的、位相だけ _t で進める
-func _draw_meteor_shower(left: float, right: float, top: float) -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = SHOWER_SEED
-	for _i in SHOWER_COUNT:
-		var start := Vector2(rng.randf_range(left, right), rng.randf_range(top, -250.0))
-		var speed := rng.randf_range(SHOWER_SPEED.x, SHOWER_SPEED.y)
-		var dir := Vector2(-rng.randf_range(SHOWER_DRIFT.x, SHOWER_DRIFT.y), 1.0).normalized()
-		var length := rng.randf_range(SHOWER_LENGTH.x, SHOWER_LENGTH.y)
-		var alpha := rng.randf_range(0.25, 0.6)
-		var boom_r := rng.randf_range(SHOWER_EXPLOSION_RADIUS.x, SHOWER_EXPLOSION_RADIUS.y)
-
-		# 開始位置から地面（y=0）までの落下時間 + 爆発時間で 1 周期
-		var fall_time := (0.0 - start.y) / dir.y / speed
-		var cycle := fall_time + SHOWER_EXPLOSION_TIME
-		var phase := fposmod(_t + rng.randf_range(0.0, cycle), cycle)
-
-		if phase < fall_time:
+## 独自の周期でループする。パラメータは _shower_cache（固定シード）、位相だけ _t で進める
+func _draw_meteor_shower() -> void:
+	for i in _shower_active_count():
+		var m := _shower_cache[i]
+		var phase := fposmod(_t + (m["phase_off"] as float), m["cycle"] as float)
+		if phase < (m["fall_time"] as float):
 			# 落下中: 尾を引く光の筋（先端ほど明るい 2 重線）
-			var pos := start + dir * speed * phase
-			var tail := pos - dir * length
-			draw_line(tail, pos,
+			var dir: Vector2 = m["dir"]
+			var length: float = m["length"]
+			var alpha: float = m["alpha"]
+			var pos: Vector2 = (m["start"] as Vector2) + dir * (m["speed"] as float) * phase
+			draw_line(pos - dir * length, pos,
 					Color(SHOWER_COLOR.r, SHOWER_COLOR.g, SHOWER_COLOR.b, alpha * 0.4), 1.5)
 			draw_line(pos - dir * length * 0.35, pos,
 					Color(1.0, 0.85, 0.55, alpha), 2.5)
 		else:
 			# 着弾: 広がって消える爆発
-			var e := (phase - fall_time) / SHOWER_EXPLOSION_TIME
-			var impact := start + dir * speed * fall_time + Vector2(0.0, -4.0)
-			_draw_explosion(impact, e, boom_r)
+			var e := (phase - (m["fall_time"] as float)) / SHOWER_EXPLOSION_TIME
+			_draw_explosion(m["impact"], e, m["boom_r"])
 
 
 ## 広がって消える爆発（グロー → 芯 → 衝撃波の輪）。e は進行度 0〜1
@@ -350,6 +549,126 @@ func _draw_missiles() -> void:
 		elif phase < flight + MISSILE_EXPLOSION_TIME:
 			# 着弾。爆発だけしてアポフィスは無傷（描き換えない）
 			_draw_explosion(to, (phase - flight) / MISSILE_EXPLOSION_TIME, boom_r)
+
+
+## 群衆の描画。走る（腕を振り上げて助けを求める）→ 燃える → 黒い塊が残る。
+## 足元は地面（y=0）。1 人あたり数プリミティブの棒人間で、火はちらつかせる
+func _draw_crowd() -> void:
+	for p in _crowd:
+		var x: float = p["x"]
+		var h: float = p["h"]
+		var ph: float = p["ph"]
+		match p["state"]:
+			0:
+				var running := absf((p["stop"] as float) - x) > 2.0
+				# 走っている間は上下に弾む
+				var bob := absf(sin(_t * 9.0 + ph)) * (2.2 if running else 0.8)
+				var hip := Vector2(x, -h * 0.45 - bob)
+				var neck := Vector2(x, -h * 0.85 - bob)
+				var shirt: Color = p["shirt"]
+				# 脚（走行中は交互に開く）
+				var swing := sin(_t * 11.0 + ph) * (4.0 if running else 1.0)
+				draw_line(hip, Vector2(x + swing, 0.0), shirt, 1.6)
+				draw_line(hip, Vector2(x - swing, 0.0), shirt, 1.6)
+				# 胴体と頭
+				draw_line(hip, neck, shirt, 2.2)
+				draw_circle(Vector2(x, -h * 0.92 - bob), h * 0.14, CROWD_SKIN_COLOR)
+				# 両腕を振り上げて左右に振る（助けを求める仕草）
+				var wave := sin(_t * 6.0 + ph) * 2.5
+				draw_line(neck, Vector2(x - h * 0.22 + wave, -h - 3.0 - bob),
+						CROWD_SKIN_COLOR, 1.4)
+				draw_line(neck, Vector2(x + h * 0.22 + wave, -h - 3.0 - bob),
+						CROWD_SKIN_COLOR, 1.4)
+			1:
+				# 燃焼中: 人影が黒ずみ、炎に包まれる
+				var e: float = clampf((p["burn"] as float) / CROWD_BURN_TIME, 0.0, 1.0)
+				var dark := Color(0.3, 0.2, 0.15, 1).lerp(Color(0.05, 0.04, 0.04, 1), e)
+				draw_line(Vector2(x, 0.0), Vector2(x, -h * (1.0 - e * 0.5)), dark, 2.6)
+				for j in 3:
+					var flick := 0.7 + 0.3 * sin(_t * 21.0 + ph + j * 2.3)
+					draw_circle(Vector2(x + sin(_t * 13.0 + j) * 2.0, -h * (0.25 + j * 0.3)),
+							(3.5 - j * 0.7) * flick, Color(1.0, 0.55, 0.15, 0.8 - e * 0.4))
+				draw_circle(Vector2(x, -h - 6.0), 3.0, Color(0.3, 0.28, 0.26, 0.3))
+			2:
+				# 焼け跡（黒い塊とかすかな残り火）
+				draw_circle(Vector2(x, -3.0), 4.5, Color(0.07, 0.06, 0.06, 1))
+				var ember := 0.5 + 0.5 * sin(_t * 5.0 + ph)
+				draw_circle(Vector2(x + 1.5, -4.5), 1.2,
+						Color(1.0, 0.4, 0.1, 0.35 * ember))
+
+
+## 他国のロケット 10 機が視界の下から炎を噴いて登ってくるが、順に隕石に撃ち抜かれて
+## 全機墜ちる演出。上昇 → 直前に隕石の光条が刺さる → 爆発 → 燃える残骸が落ちて消える
+func _draw_escape_rockets() -> void:
+	if not _escape_started:
+		return
+	for i in ESCAPE_ROCKETS.size():
+		var data := ESCAPE_ROCKETS[i]
+		var offset: Vector2 = data["offset"]
+		var speed: float = data["speed"]
+		var doom: float = data["doom"]
+		var rocket_scale: float = data["scale"]
+		var base := _escape_origin + offset
+
+		if _escape_t < doom:
+			# 上昇中
+			_draw_escape_rocket_body(base + Vector2(0.0, -speed * _escape_t),
+					rocket_scale, i)
+			# 撃墜の 0.3 秒前から、隕石の光条が上から刺さってくる
+			var lead := _escape_t - (doom - 0.3)
+			if lead > 0.0:
+				var doom_pos := base + Vector2(0.0, -speed * doom)
+				# 光条の向きは機ごとに左右へ振る（同じ角度が 10 本並ぶと嘘くさい）
+				var from := Vector2(320.0 * (1.0 if i % 2 == 0 else -1.0), -480.0)
+				var head := doom_pos + from * (1.0 - lead / 0.3)
+				var dir := -from.normalized()
+				draw_line(head - dir * 70.0, head, Color(1.0, 0.7, 0.35, 0.8), 2.5)
+			continue
+
+		var doom_pos := base + Vector2(0.0, -speed * doom)
+		var td := _escape_t - doom
+		if td < ESCAPE_EXPLOSION_TIME:
+			_draw_explosion(doom_pos, td / ESCAPE_EXPLOSION_TIME, 70.0 * rocket_scale + 20.0)
+		if td < ESCAPE_DEBRIS_TIME:
+			# 燃える残骸が弧を描いて落ち、薄れて消える
+			var fade := 1.0 - td / ESCAPE_DEBRIS_TIME
+			var pos := doom_pos + Vector2(60.0 * td * (1.0 if i % 2 == 0 else -1.0),
+					0.5 * PLANE_FALL_ACCEL * td * td)
+			draw_circle(pos, 9.0 * rocket_scale + 2.0,
+					Color(1.0, 0.55, 0.2, 0.7 * fade))
+			for j in 3:
+				draw_circle(pos + Vector2(0.0, -14.0 - j * 14.0), 4.0 + j * 2.5,
+						Color(0.45, 0.42, 0.4, 0.25 * fade))
+
+
+## 遠景の脱出ロケット 1 機。プレイヤー機と同じ「上向き + 噴射炎」の記号で描き、
+## 倍率で遠近感を出す。i は炎のちらつき位相をずらすためのインデックス
+func _draw_escape_rocket_body(pos: Vector2, rocket_scale: float, i: int) -> void:
+	draw_set_transform(pos, 0.0, Vector2(rocket_scale, rocket_scale))
+
+	# 噴射炎（ちらつき）と煙の尾
+	var flick := 0.75 + 0.25 * sin(_t * 23.0 + i * 2.7)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(-7.0, 20.0), Vector2(7.0, 20.0), Vector2(0.0, 20.0 + 34.0 * flick),
+	]), Color(1.0, 0.6, 0.2, 0.85))
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(-3.5, 20.0), Vector2(3.5, 20.0), Vector2(0.0, 20.0 + 20.0 * flick),
+	]), Color(1.0, 0.9, 0.55, 0.9))
+	for j in 4:
+		draw_circle(Vector2(sin(_t * 3.0 + j * 1.8) * 4.0, 46.0 + j * 22.0),
+				6.0 + j * 3.0, Color(0.55, 0.55, 0.6, 0.22 - j * 0.045))
+
+	# 機体（カプセル型 + ノーズコーン + フィン）
+	draw_rect(Rect2(-9.0, -12.0, 18.0, 32.0), ESCAPE_BODY_COLOR)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(-9.0, -12.0), Vector2(9.0, -12.0), Vector2(0.0, -30.0),
+	]), Color(0.85, 0.4, 0.3, 1))
+	for side: float in [-1.0, 1.0]:
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(side * 9.0, 20.0), Vector2(side * 9.0, 6.0), Vector2(side * 17.0, 20.0),
+		]), Color(0.5, 0.53, 0.62, 1))
+
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## 旅客機の演出。飛行（2〜3 秒）→ 空中爆発 → 火を噴いて墜落 → 地面で爆発 →
