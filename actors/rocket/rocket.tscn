@@ -1,6 +1,7 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://actors/rocket/rocket.gd" id="1_rocket"]
+[ext_resource type="AudioStream" uid="uid://tepmyuyw1rsm" path="res://BGM_SE/SE/ロケット発射.mp3" id="2_launch_se"]
 
 [sub_resource type="CircleShape2D" id="Shape_rocket"]
 radius = 30.0
@@ -76,6 +77,9 @@ polygon = PackedVector2Array(0, 46, 7, 58, 0, 86, -7, 58)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("Shape_rocket")
+
+[node name="LaunchSe" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("2_launch_se")
 
 [node name="Hitbox" type="Area2D" parent="."]
 collision_layer = 0

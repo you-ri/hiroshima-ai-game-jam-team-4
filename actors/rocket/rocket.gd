@@ -51,9 +51,12 @@ var destroy_on_contact := false
 @onready var _flame_core: Polygon2D = $FlameCore
 @onready var _hitbox: Area2D = $Hitbox
 @onready var _smoke: CPUParticles2D = $Smoke
+@onready var _launch_se: AudioStreamPlayer = $LaunchSe
 
 var _flame_timer := 0.0
 var _flicker := 0.0
+## 発射音を鳴らし終えたか。最初の 1 噴射だけ鳴らし、連打では鳴らさない
+var _launched := false
 var _blink_t := 0.0
 ## 0 = 通常のもくもく、1 = 噴射中の噴煙
 var _smoke_boost := 0.0
@@ -79,6 +82,10 @@ func _physics_process(delta: float) -> void:
 		var forward := Vector2.UP.rotated(rotation)
 		apply_central_impulse(forward * Units.m_to_px(THRUST_MPS) * mass)
 		_flame_timer = FLAME_TIME
+		# 発射音は離陸の 1 回だけ。連打ごとに鳴らすと重なって潰れる
+		if not _launched:
+			_launched = true
+			_launch_se.play()
 
 	_flicker += delta
 
@@ -113,6 +120,13 @@ func set_invulnerable(on: bool) -> void:
 	if not on:
 		modulate.a = 1.0
 		_blink_t = 0.0
+
+
+## 発射音を止めて「未離陸」に戻す。被弾で機体が消えたときにシーン側が呼ぶ。
+## これで爆発後に発射音が鳴り続けず、スタート地点からの再出撃でまた鳴る。
+func reset_launch_sound() -> void:
+	_launched = false
+	_launch_se.stop()
 
 
 ## 煙は止めない（常にもくもく出る）。噴射中だけ噴き出す勢いと粒の大きさを上げる。

@@ -1,7 +1,8 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scenes/ui/game_clear.gd" id="1_game_clear"]
 [ext_resource type="Script" path="res://scenes/ui/space_backdrop.gd" id="2_backdrop"]
+[ext_resource type="AudioStream" uid="uid://dq62xv3h2aokf" path="res://BGM_SE/BGM/ichijou-no-hikari.mp3" id="3_bgm"]
 
 [sub_resource type="Gradient" id="Gradient_sky"]
 offsets = PackedFloat32Array(0, 0.45, 1)
@@ -30,6 +31,11 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1_game_clear")
+
+[node name="Bgm" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("3_bgm")
+volume_db = -6.0
+autoplay = true
 
 [node name="Sky" type="TextureRect" parent="."]
 layout_mode = 1

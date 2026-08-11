@@ -80,12 +80,6 @@ const SHOWER_EXPLOSION_RADIUS := Vector2(26.0, 72.0)
 ## 低空では流星を間引く。地上では 1/4、この高度（雲海の下端）で全数になる
 const SHOWER_MIN_FRACTION := 0.25
 const SHOWER_FULL_ALTITUDE_M := 950.0
-## 群衆を焼く弾の着弾 x。走路の途中 2 箇所 + 右側の集合地点の縁 1 箇所。
-## 密集の中心に置くと数秒で全滅するため「たまに巻き込まれる」位置を選んである。
-## 対象の弾は「地上でも有効な先頭 1/4 のうち、落下周期が長いもの」から充てる
-## （周期の短い弾に割り当てると 1 秒間隔の連射になり、通り道の全員が焼けてしまう）
-const SHOWER_BURN_TARGET_XS: Array[float] = [-520.0, 205.0, 380.0]
-
 ## 雲海の中の高度を飛ぶ旅客機（一度きりの演出）。カメラが TRIGGER 高度を超えると
 ## 右から現れ、数秒飛んだところで被弾して爆発し、火を噴きながら墜落する。当たり判定なし。
 ## 暗い空が背景だと機体が見えないため、明るい雲海（970〜1300m）を背にして飛ばす
@@ -139,18 +133,17 @@ const ESCAPE_DEBRIS_TIME := 1.8
 const ESCAPE_BODY_COLOR := Color(0.72, 0.75, 0.84, 1)
 
 ## スタート地点の発射台へ、助けを求めて走り寄ってくる群衆（純粋な演出）。
-## ロケットの機体がぶつかる・噴射炎が当たる・落下してくる流星の爆発に巻き込まれる、
-## のいずれかで焼かれてしまう。残機・スコア等のゲームプレイには一切影響しない
+## 接触判定は持たず、時間経過で一人ずつ順々に焼かれていく
+## （降り注ぐ流星に世界が焼かれていく画）。残機・スコア等のゲームプレイには一切影響しない
 const CROWD_SEED := 4444
 const CROWD_COUNT := 100
 ## 出現位置と、集まって立ち止まる位置（発射台の縁）の x 距離範囲
 const CROWD_SPAWN_X := Vector2(170.0, 640.0)
 const CROWD_STOP_X := Vector2(112.0, 240.0)
 const CROWD_SPEED := Vector2(30.0, 85.0)
-## 機体との接触・噴射炎との接触とみなす距離（px）。炎は Flame ポリゴンの中心付近で判定
-const CROWD_BUMP_RADIUS := 44.0
-const CROWD_FLAME_RADIUS := 52.0
-const CROWD_FLAME_OFFSET := 82.0
+## 発火が始まる時刻（秒。集まる姿を少し見せてから）と、全員に行き渡るまでの幅（秒）
+const CROWD_BURN_START := 4.0
+const CROWD_BURN_SPAN := 10.0
 ## 燃え尽きるまでの時間（秒）。その後は黒い塊になって残る
 const CROWD_BURN_TIME := 1.1
 const CROWD_SKIN_COLOR := Color(0.85, 0.7, 0.55, 1)
@@ -181,8 +174,7 @@ var _escape_t := 0.0
 var _escape_origin := Vector2.ZERO
 ## 群衆。1 人 1 Dictionary（x=現在位置, stop=目標位置, state: 0=走る 1=燃焼中 2=焼死体）
 var _crowd: Array[Dictionary] = []
-## 流星群の各弾のパラメータ（固定シードから setup() で一度だけ生成）。
-## 描画と、群衆への着弾判定の両方が同じ値を参照する
+## 流星群の各弾のパラメータ（固定シードから setup() で一度だけ生成）
 var _shower_cache: Array[Dictionary] = []
 
 
@@ -208,6 +200,8 @@ func _init_crowd() -> void:
 					rng.randf_range(0.2, 0.5), 1.0),
 			"state": 0,
 			"burn": 0.0,
+			# この時刻（_t）になったら発火する。全員バラバラで順々に燃えていく
+			"doom": CROWD_BURN_START + rng.randf_range(0.0, CROWD_BURN_SPAN),
 		})
 
 
@@ -236,33 +230,8 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
-## 群衆の移動と、ロケット本体・噴射炎との接触判定。
-## ロケットは "player" グループから探す（見つからないフレームは移動だけ行う）
+## 群衆の移動と発火。接触判定は持たず、各自の doom 時刻が来たら順々に燃えていく
 func _update_crowd(delta: float) -> void:
-	var rocket := get_tree().get_first_node_in_group("player") as Node2D
-	var rocket_pos := Vector2.ZERO
-	var flame_pos := Vector2.ZERO
-	var flame_on := false
-	if rocket != null and rocket.visible:
-		rocket_pos = rocket.global_position
-		var flame := rocket.get_node_or_null("Flame") as Node2D
-		flame_on = flame != null and flame.visible
-		# Flame ポリゴン（local y=46〜118）の中心あたりを炎の当たり位置とする
-		flame_pos = rocket_pos + Vector2(0.0, CROWD_FLAME_OFFSET).rotated(rocket.rotation)
-
-	# いま爆発中の流星（有効数の中の、群衆を焼く弾のみ）の着弾点を集める
-	var impacts: Array[Vector2] = []
-	var impact_radii: Array[float] = []
-	for i in _shower_active_count():
-		var m := _shower_cache[i]
-		if not (m["burns"] as bool):
-			continue
-		var phase := fposmod(_t + (m["phase_off"] as float), m["cycle"] as float)
-		if phase >= (m["fall_time"] as float):
-			impacts.append(m["impact"])
-			# 見た目の爆発より狭い「直撃圏」だけ焼く（見た目どおりだと一撃で焼けすぎる）
-			impact_radii.append((m["boom_r"] as float) * 0.5)
-
 	for p in _crowd:
 		match p["state"]:
 			0:
@@ -270,18 +239,8 @@ func _update_crowd(delta: float) -> void:
 				var dx: float = p["stop"] - p["x"]
 				if absf(dx) > 2.0:
 					p["x"] += signf(dx) * (p["speed"] as float) * delta
-				var pos := Vector2(p["x"], -(p["h"] as float) * 0.5)
-				# 機体か炎に触れたら燃え始める
-				if rocket != null and rocket.visible \
-						and (pos.distance_to(rocket_pos) < CROWD_BUMP_RADIUS \
-						or (flame_on and pos.distance_to(flame_pos) < CROWD_FLAME_RADIUS)):
+				if _t >= (p["doom"] as float):
 					p["state"] = 1
-					continue
-				# 流星の着弾爆発に巻き込まれても燃える
-				for i in impacts.size():
-					if pos.distance_to(impacts[i]) < impact_radii[i]:
-						p["state"] = 1
-						break
 			1:
 				p["burn"] = (p["burn"] as float) + delta
 				if p["burn"] >= CROWD_BURN_TIME:
@@ -323,28 +282,7 @@ func _build_shower_cache() -> void:
 			"cycle": cycle,
 			"phase_off": rng.randf_range(0.0, cycle),
 			"impact": start + dir * speed * fall_time + Vector2(0.0, -4.0),
-			"burns": false,
 		})
-	_assign_burn_meteors()
-
-
-## 群衆を焼く弾を選んで着弾点を差し替える。地上でも有効な先頭 1/4 のうち
-## 落下周期が長い順に SHOWER_BURN_TARGET_XS の x へ着弾させる
-func _assign_burn_meteors() -> void:
-	var ground_active := int(ceil(_shower_cache.size() * SHOWER_MIN_FRACTION))
-	var order := range(ground_active)
-	order.sort_custom(func(a: int, b: int) -> bool:
-		return (_shower_cache[a]["fall_time"] as float) > (_shower_cache[b]["fall_time"] as float))
-	for j in SHOWER_BURN_TARGET_XS.size():
-		var m := _shower_cache[order[j]]
-		var target_x := SHOWER_BURN_TARGET_XS[j]
-		# 指定 x に着弾するよう開始位置を逆算して差し替える
-		var start: Vector2 = m["start"]
-		start.x = target_x - (m["dir"] as Vector2).x * (m["speed"] as float) \
-				* (m["fall_time"] as float)
-		m["start"] = start
-		m["impact"] = Vector2(target_x, -4.0)
-		m["burns"] = true
 
 
 func _draw() -> void:

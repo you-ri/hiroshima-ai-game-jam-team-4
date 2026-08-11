@@ -12,7 +12,7 @@ dest_files=["res://.godot/imported/wakusei-x.mp3-c8469fd1a05ee268d77882f2a986fe5
 
 [params]
 
-loop=false
+loop=true
 loop_offset=0
 bpm=0
 beat_count=0

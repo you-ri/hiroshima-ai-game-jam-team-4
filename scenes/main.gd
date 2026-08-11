@@ -247,6 +247,7 @@ func _on_rocket_hit() -> void:
 	_shake = SHAKE_STRENGTH
 	_rocket.visible = false
 	_rocket.controls_enabled = false
+	_rocket.reset_launch_sound()  # 機体は消えたので発射音も切る（再出撃でまた鳴る）
 	# 爆発中に再被弾しないよう当たり判定を切る（無敵タイマーはリスポーン時に開始）
 	_rocket.set_invulnerable(true)
 	# area_entered のフラッシュ中は body mode を変えられないため deferred にする
