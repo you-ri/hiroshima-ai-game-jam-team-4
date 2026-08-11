@@ -17,6 +17,7 @@ position = Vector2(0, -30)
 [node name="Camera2D" type="Camera2D" parent="." unique_id=2028896950]
 
 [node name="Background" type="Node2D" parent="." unique_id=582028447]
+visible = false
 script = ExtResource("3_background")
 
 [node name="UI" type="CanvasLayer" parent="." unique_id=108755547]
