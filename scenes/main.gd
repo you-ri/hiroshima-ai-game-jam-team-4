@@ -2,6 +2,7 @@ extends Node2D
 ## 縦スクロール・クライマー「アポフィス」（射撃なし）。
 ## 仕様（docs/Spec.txt）:
 ## - スタートは 0m。地面の上に立つ。ゴールは 3000m（= 6 画面分。1m = 1.44px、scripts/units.gd）
+##   ゴール = 大気圏界面。超えるとカメラが止まり、機体が自動で上昇して画面外へ抜けたらクリア
 ## - カメラは常にプレイヤーを中心に映す
 ## - W 連打で推進（A/D で旋回、無操作は自然落下）
 ## - 残機制 3。障害物に 3 回当たると失敗
@@ -22,10 +23,19 @@ const WALL_THICKNESS := 24.0
 const START_LIVES := 3
 const INVULN_TIME := 2.0
 
-## Spec: ゴールは 3000m
+## Spec: ゴールは 3000m。この高度が大気圏界面（背景に光る線として描かれる）
 const GOAL_ALTITUDE_M := 3000.0
+## 界面が近いことを 1 度だけ知らせる高度
+const ATMOSPHERE_WARN_ALTITUDE_M := 2700.0
 ## Spec: 隕石はプレイヤーが高度 1000m に到達してから生成される
 const METEOR_UNLOCK_ALTITUDE_M := 1000.0
+
+## 大気圏突破後の自動上昇（脱出演出）。操作を切り、カメラを止めて機体だけ画面外へ抜ける
+const ESCAPE_SPEED_START_MPS := 60.0
+const ESCAPE_SPEED_MAX_MPS := 420.0
+const ESCAPE_ACCEL_MPS2 := 260.0
+## 機体が完全に画面外へ出たと見なすための余裕（px）
+const ESCAPE_OFFSCREEN_MARGIN := 90.0
 
 ## 結果画面（クリア／ゲームオーバー）の遷移先
 const GAME_CLEAR_SCENE_PATH := "res://scenes/ui/game_clear.tscn"
@@ -70,6 +80,12 @@ var _lives := START_LIVES
 var _cleared := false
 var _game_over := false
 var _meteor_unlocked := false
+var _atmosphere_warned := false
+## 大気圏突破後の自動上昇中。この間は操作・スポーンを止め、カメラを固定する
+var _escaping := false
+var _escape_speed := 0.0
+var _camera_locked := false
+var _camera_locked_pos := Vector2.ZERO
 var _invuln_timer := 0.0
 var _spawn_timer_rock := 0.0
 var _spawn_timer_meteor := 0.0
@@ -88,7 +104,7 @@ func _ready() -> void:
 
 	_build_walls()
 	_build_ground()
-	_background.setup(goal_y, GROUND_Y, HALF_STAGE_WIDTH, DESIGN_HEIGHT)
+	_background.setup(goal_y, GROUND_Y, HALF_STAGE_WIDTH, DESIGN_HEIGHT, GOAL_ALTITUDE_M)
 
 	_alt_bar.position = Vector2(DESIGN_WIDTH - 56.0, 40.0)
 	_alt_bar.size = Vector2(32.0, DESIGN_HEIGHT - 80.0)
@@ -103,6 +119,11 @@ func _physics_process(delta: float) -> void:
 	if _cleared or _game_over:
 		return
 
+	# 大気圏突破後は操作も障害物の生成も止め、脱出演出だけを進める
+	if _escaping:
+		_process_escape(delta)
+		return
+
 	if _invuln_timer > 0.0:
 		_invuln_timer -= delta
 		if _invuln_timer <= 0.0:
@@ -110,14 +131,14 @@ func _physics_process(delta: float) -> void:
 
 	var altitude := _altitude_m()
 
+	# 大気圏界面に到達。ここでクリアにはせず、自動上昇して画面外へ抜けるまで待つ
 	if altitude >= GOAL_ALTITUDE_M:
-		_cleared = true
-		_rocket.controls_enabled = false
-		_rocket.freeze = true
-		_show_message("クリア！")
-		print("[main] CLEARED at %.0fm" % altitude)
-		_go_to_result(GAME_CLEAR_SCENE_PATH)
+		_start_escape(altitude)
 		return
+
+	if not _atmosphere_warned and altitude >= ATMOSPHERE_WARN_ALTITUDE_M:
+		_atmosphere_warned = true
+		_show_message("まもなく大気圏外！ 光る線を抜けろ", 2.0)
 
 	# Spec: 隕石は高度 1000m 到達後に生成開始（一度解禁されたら降りても止まらない）
 	if not _meteor_unlocked and altitude >= METEOR_UNLOCK_ALTITUDE_M:
@@ -137,12 +158,16 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
-	# Spec: カメラは常にプレイヤーを中心に映す（クランプなし）。爆発中はシェイクを乗せる
+	# Spec: カメラは常にプレイヤーを中心に映す（クランプなし）。爆発中はシェイクを乗せる。
+	# ただし大気圏突破後は境界が見える位置で固定し、機体が画面外へ抜けるのを見せる
 	var offset := Vector2.ZERO
 	if _shake > 0.0:
 		offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake
 		_shake = maxf(_shake - SHAKE_DECAY * delta, 0.0)
-	_camera.global_position = _rocket.global_position + offset
+	if _camera_locked:
+		_camera.global_position = _camera_locked_pos
+	else:
+		_camera.global_position = _rocket.global_position + offset
 	_update_hud()
 
 	if _message_timer > 0.0:
@@ -154,6 +179,47 @@ func _process(delta: float) -> void:
 ## 高度（m）。地面に接地した状態が 0m
 func _altitude_m() -> float:
 	return maxf(Units.px_to_m(GROUND_CENTER_Y - _rocket.global_position.y), 0.0)
+
+
+## 大気圏界面を超えた瞬間。操作を取り上げ、カメラを止めて自動上昇へ移る。
+## 演出中は controls_enabled = false なので障害物に当たっても被弾しない
+func _start_escape(altitude: float) -> void:
+	_escaping = true
+	_escape_speed = Units.m_to_px(ESCAPE_SPEED_START_MPS)
+	_camera_locked = true
+	_camera_locked_pos = _camera.global_position
+	_shake = 0.0
+
+	_rocket.controls_enabled = false
+	_rocket.escape_burn = true  # 入力なしでも噴射しっぱなしに見せる
+	_rocket.angular_velocity = 0.0
+	_rocket.linear_velocity = Vector2.ZERO
+	# 以降は位置をこちらで動かすので物理は止める（area_entered 中でも安全なよう deferred）
+	_rocket.set_deferred("freeze", true)
+
+	_show_message("大気圏突破！", 4.0)
+	print("[main] atmosphere exit at %.0fm" % altitude)
+
+
+## 自動上昇。加速しながら真上へ抜け、画面上端より外へ出たらクリアにする
+func _process_escape(delta: float) -> void:
+	_escape_speed = minf(_escape_speed + Units.m_to_px(ESCAPE_ACCEL_MPS2) * delta,
+			Units.m_to_px(ESCAPE_SPEED_MAX_MPS))
+	_rocket.global_position.y -= _escape_speed * delta
+	_rocket.rotation = lerp_angle(_rocket.rotation, 0.0, minf(delta * 6.0, 1.0))
+
+	var screen_top := _camera_locked_pos.y - DESIGN_HEIGHT * 0.5
+	if _rocket.global_position.y + ESCAPE_OFFSCREEN_MARGIN > screen_top:
+		return
+
+	# 画面外へ出た = クリア
+	_escaping = false
+	_cleared = true
+	_rocket.escape_burn = false
+	_rocket.visible = false
+	_show_message("大気圏外へ脱出！")
+	print("[main] CLEARED off-screen at %.0fm" % _altitude_m())
+	_go_to_result(GAME_CLEAR_SCENE_PATH)
 
 
 func _on_rocket_hit() -> void:
@@ -250,7 +316,10 @@ func _random_away_from(player_x: float) -> float:
 func _update_hud() -> void:
 	var altitude := _altitude_m()
 	var fraction := clampf(altitude / GOAL_ALTITUDE_M, 0.0, 1.0)
-	_altitude_label.text = "高度 %d m / %d m" % [int(altitude), int(GOAL_ALTITUDE_M)]
+	if _escaping or _cleared:
+		_altitude_label.text = "高度 %d m ／ 大気圏突破！" % int(altitude)
+	else:
+		_altitude_label.text = "高度 %d m / 大気圏外 %d m" % [int(altitude), int(GOAL_ALTITUDE_M)]
 
 	var h := _alt_bar.size.y * fraction
 	_alt_fill.position = Vector2(0.0, _alt_bar.size.y - h)
