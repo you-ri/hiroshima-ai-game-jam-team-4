@@ -9,13 +9,17 @@ class_name Rocket
 ##
 ## 被弾判定は子の Hitbox(Area2D) が障害物(Area2D)と重なったとき `hit` を発火する。
 ## 当たった後の処理（残機・リスポーン）はシーン側（scenes/main.gd）が行う。
+## destroy_on_contact が true の間は被弾せず、接触した障害物を破壊する
+## （金色の脱出ポッドによる無敵。Spec の Item セクション）。
 
 signal hit
+## destroy_on_contact 中に接触した障害物を渡す（破壊処理はシーン側）
+signal obstacle_destroyed(area: Area2D)
 
 ## 旋回角速度（rad/s）。
 const TURN_SPEED := 3.0
 ## 連打 1 回で得る速度変化（Spec: 一度の推進は 20 m/s 上がる）
-const THRUST_MPS := 20.0
+const THRUST_MPS := 30.0
 ## 最大速度（Spec: 100 m/s）。上昇・落下とも _integrate_forces でクランプする
 const MAX_SPEED_MPS := 100.0
 ## 重力加速度（m/s²）。Spec に規定が無いためゲームフィール調整値。
@@ -40,6 +44,8 @@ var controls_enabled := true
 var escape_burn := false
 ## 被弾後の無敵。true の間は Hitbox を無効化し点滅する（シーン側が制御）
 var invulnerable := false
+## 接触した岩・隕石を破壊する無敵（金色の脱出ポッド）。true の間は被弾しない
+var destroy_on_contact := false
 
 @onready var _flame: Polygon2D = $Flame
 @onready var _flame_core: Polygon2D = $FlameCore
@@ -146,6 +152,10 @@ func _set_flame(on: bool) -> void:
 		_flame_core.scale = Vector2.ONE
 
 
-func _on_hitbox_area_entered(_area: Area2D) -> void:
-	if not invulnerable and controls_enabled:
+func _on_hitbox_area_entered(area: Area2D) -> void:
+	if not controls_enabled:
+		return
+	if destroy_on_contact:
+		obstacle_destroyed.emit(area)
+	elif not invulnerable:
 		emit_signal("hit")
