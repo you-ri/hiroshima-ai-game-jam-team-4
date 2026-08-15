@@ -34,7 +34,9 @@
 
 | 症状 | 原因 | 対処 |
 |---|---|---|
-| 日本語が豆腐／空白 | 内蔵フォントに CJK グリフが無い | `SystemFont`（`Yu Gothic UI` 等）を `theme_override_fonts/font` に指定 |
+| 日本語が豆腐／空白 | 内蔵フォントに CJK グリフが無い | 同梱の `assets/fonts/NotoSansJP-Regular.ttf` を `theme_override_fonts/font` に指す（[godot-conventions.md](godot-conventions.md) の「フォント（日本語）」） |
+| **エディタでは出るのに書き出すと日本語が消える／文字化けする** | `SystemFont`（`Yu Gothic UI` 等）を使っている。**Web 書き出しには OS のフォントが無い** | 同上。`SystemFont` を残す場合は `fallbacks` に同梱フォントを入れる |
+| 同梱フォントにしたのに一部の字だけ豆腐 | サブセットが JIS 第一水準までなので第二水準・異体字は入っていない | `python tools/make_jp_font.py` で作り直して `bash tools/godot.sh import` |
 | UI が中央に来ない | `anchors_preset` だけ書いてアンカー値が無い | `anchor_*` と `offset_*` を併記 |
 | ウィンドウサイズを変えると崩れる | ピクセル位置をハードコードしている | stretch は `canvas_items`/`expand`。基準ビューポートに対して組む |
 | ヘッドレスで画が取れない | dummy レンダラなので当然 | `bash tools/godot.sh run` でウィンドウ起動して目視 |

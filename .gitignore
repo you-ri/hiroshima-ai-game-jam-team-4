@@ -5,6 +5,9 @@
 # ローカル環境固有（メンバーごとに Godot の置き場所が違う / docs/setup.md）
 /.godot-path
 
+# エディタが保存中に作る一時ファイル（*.tscn1234567890.tmp）。残っても中身は不要
+*.tscn*.tmp
+
 # ヘッドレス検証用の使い捨てスクリプト（docs/workflow.md）
 /_verify*.gd
 /_verify*.gd.uid

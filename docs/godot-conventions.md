@@ -110,12 +110,45 @@ vertical_alignment = 1
 
 - **`anchors_preset` だけではアンカーは設定されない。** `anchor_*` と `offset_*` も併記する。
 - stretch が `canvas_items` / `expand` なので、**基準ビューポート**に対して組む。ウィンドウサイズからピクセル位置を計算しない。
-- **日本語は内蔵フォントに CJK グリフが無く豆腐になる。** `SystemFont` を挿す:
+- **日本語は同梱フォントを使う。**（下の「フォント（日本語）」）
+
+## フォント（日本語）
+
+内蔵フォントに CJK グリフが無いので、何もしないと日本語は豆腐になる。
+**`SystemFont`（`Yu Gothic UI` 等）で解決してはいけない。** エディタと Windows 実行では通るが、
+**Web 書き出しには OS のフォントが存在しない**ので、書き出した瞬間に日本語が消える（文字化けの正体）。
+
+リポジトリに `assets/fonts/NotoSansJP-Regular.ttf`（OFL / JIS 第一水準までにサブセット・約 1.3MB）を同梱している。
+日本語を出すラベルはこれを指す:
 
 ```
-[sub_resource type="SystemFont" id="Font_ui"]
-font_names = PackedStringArray("Yu Gothic UI", "Meiryo UI", "MS UI Gothic", "Segoe UI")
+[ext_resource type="FontFile" uid="uid://u1qap7mktt0w" path="res://assets/fonts/NotoSansJP-Regular.ttf" id="5_font_jp"]
+
+[sub_resource type="FontVariation" id="Font_ui"]
+base_font = ExtResource("5_font_jp")
 ```
+
+```
+theme_override_fonts/font = SubResource("Font_ui")
+```
+
+- `project.godot` の `gui/theme/custom_font` にも設定済みなので、**フォント指定を書かないラベルでも日本語は出る。**
+  新しくラベルを足すときは、こだわりが無ければ `theme_override_fonts/font` を書かないのが一番安全。
+- 欧文だけを別の書体で見せたい場合（`Font_display` の `Bahnschrift` 等）は `SystemFont` のままでよいが、
+  **`fallbacks` に同梱フォントを必ず入れる**。そのフォントが無い環境（Web）でも読める字に落ちる:
+
+```
+[sub_resource type="SystemFont" id="Font_display"]
+fallbacks = Array[Font]([ExtResource("3_font_jp")])
+font_names = PackedStringArray("Bahnschrift", "Segoe UI Semibold", "Segoe UI", "Arial")
+font_weight = 700
+```
+
+- 収録は JIS 第一水準まで。**第二水準の漢字（𠮟・薔薇の「薔」など）は入っていない。**
+  珍しい字を使いたくなったら `python tools/make_jp_font.py` で作り直す
+  （`fonttools` が要る。スクリプト内の説明を読むこと。プロジェクト内の `.tscn` / `.gd` に書かれた文字は自動で収録される）。
+- 確認は「読み込めた」では足りない。ラベルのテキスト全文字について `font.has_char()` を回す
+  （[workflow.md](workflow.md) の検証スクリプト）。
 
 ## project.godot
 
@@ -154,7 +187,7 @@ move_left={
 
 | 症状 | 原因 | 対処 |
 |---|---|---|
-| UI の日本語が豆腐／空白 | 内蔵フォントに CJK グリフが無い | `SystemFont` を `theme_override_fonts/font` に指定 |
+| UI の日本語が豆腐／空白（特に **書き出した後だけ**） | `SystemFont` を使っている。Web には OS のフォントが無い | 同梱の `assets/fonts/NotoSansJP-Regular.ttf` を指す（上の「フォント（日本語）」） |
 | RigidBody2D を移動させても戻される | `global_position` への代入は物理サーバーの状態を書き換えない | `_integrate_forces(state)` 内で `state.transform` / `state.linear_velocity` を設定。リスポーンは freeze → transform 変更 → unfreeze |
 | `Can't change this state while flushing queries` | `area_entered` などの物理コールバック中に `freeze` やノード追加をした | `set_deferred("freeze", true)` / `処理.call_deferred()` に逃がす（`scenes/copy_main.gd` の被弾処理） |
 | Area2D 同士が当たらない | 片方の `collision_layer` ともう片方の `collision_mask` が噛み合っていない。`monitorable = false` も見落としやすい | 検出する側に mask、検出される側に layer（Rocket の `Hitbox` は mask=2、障害物は layer=2） |

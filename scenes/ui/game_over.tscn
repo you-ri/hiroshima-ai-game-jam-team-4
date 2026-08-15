@@ -1,8 +1,9 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scenes/ui/game_over.gd" id="1_game_over"]
 [ext_resource type="Script" path="res://scenes/ui/space_backdrop.gd" id="2_backdrop"]
 [ext_resource type="AudioStream" uid="uid://ch2b1ii731dr1" path="res://BGM_SE/BGM/wakusei-x.mp3" id="3_bgm"]
+[ext_resource type="FontFile" uid="uid://u1qap7mktt0w" path="res://assets/fonts/NotoSansJP-Regular.ttf" id="4_font_jp"]
 
 [sub_resource type="Gradient" id="Gradient_sky"]
 offsets = PackedFloat32Array(0, 0.45, 1)
@@ -16,11 +17,12 @@ fill_from = Vector2(0, 0)
 fill_to = Vector2(0, 1)
 
 [sub_resource type="SystemFont" id="Font_display"]
+fallbacks = Array[Font]([ExtResource("4_font_jp")])
 font_names = PackedStringArray("Bahnschrift", "Segoe UI Semibold", "Segoe UI", "Arial")
 font_weight = 700
 
-[sub_resource type="SystemFont" id="Font_ui"]
-font_names = PackedStringArray("Yu Gothic UI", "Meiryo UI", "MS UI Gothic", "Segoe UI")
+[sub_resource type="FontVariation" id="Font_ui"]
+base_font = ExtResource("4_font_jp")
 
 [node name="GameOver" type="Control"]
 layout_mode = 3

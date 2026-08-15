@@ -1,7 +1,8 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scenes/ui/title.gd" id="1_title"]
 [ext_resource type="Script" path="res://scenes/ui/space_backdrop.gd" id="2_backdrop"]
+[ext_resource type="FontFile" uid="uid://u1qap7mktt0w" path="res://assets/fonts/NotoSansJP-Regular.ttf" id="3_font_jp"]
 
 [sub_resource type="Gradient" id="Gradient_sky"]
 offsets = PackedFloat32Array(0, 0.45, 1)
@@ -15,11 +16,12 @@ fill_from = Vector2(0, 0)
 fill_to = Vector2(0, 1)
 
 [sub_resource type="SystemFont" id="Font_display"]
+fallbacks = Array[Font]([ExtResource("3_font_jp")])
 font_names = PackedStringArray("Bahnschrift", "Segoe UI Semibold", "Segoe UI", "Arial")
 font_weight = 700
 
-[sub_resource type="SystemFont" id="Font_ui"]
-font_names = PackedStringArray("Yu Gothic UI", "Meiryo UI", "MS UI Gothic", "Segoe UI")
+[sub_resource type="FontVariation" id="Font_ui"]
+base_font = ExtResource("3_font_jp")
 
 [node name="Title" type="Control"]
 layout_mode = 3
@@ -192,8 +194,8 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -460.0
-offset_top = -46.0
+offset_left = -560.0
+offset_top = -72.0
 offset_right = -28.0
 offset_bottom = -20.0
 grow_horizontal = 0
@@ -202,6 +204,6 @@ mouse_filter = 2
 theme_override_fonts/font = SubResource("Font_ui")
 theme_override_font_sizes/font_size = 15
 theme_override_colors/font_color = Color(0.45, 0.5, 0.58, 1)
-text = "Hiroshima AI Game Jam — Team 4"
+text = "Hiroshima AI Game Jam — Team 4\nFont: Noto Sans JP © Adobe — SIL OFL 1.1"
 horizontal_alignment = 2
 vertical_alignment = 1

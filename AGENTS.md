@@ -59,7 +59,7 @@ actors/     再利用する実体。1 機能 1 フォルダで .tscn と .gd を
               rocket/    プレイヤー（RigidBody2D）
               obstacle/  岩・隕石（Area2D）
 scripts/    autoload・共通ユーティリティ（どのシーンにも属さないコード）
-assets/     art/ audio/ fonts/
+assets/     art/ audio/ fonts/（日本語同梱フォント。tools/make_jp_font.py で生成）
 tools/      godot.sh / godot.ps1
 docs/       このドキュメント群
 ```
@@ -83,6 +83,7 @@ docs/       このドキュメント群
 |---|---|---|
 | `run/main_scene` | `res://scenes/ui/title.tscn` | 起動はタイトル画面から。本編は `scenes/copy_main.tscn`（タイトル・結果画面の遷移先定数も合わせて直す。消すと `Can't run project` で全員が動かせなくなる） |
 | `[input]` | `thrust`(W) / `rotate_left`(A) / `rotate_right`(D) | 定義済みアクション。追加するときは既存の命名（動詞 `snake_case`）に合わせ、`physical_keycode` で書く |
+| `gui/theme/custom_font` | `res://assets/fonts/NotoSansJP-Regular.ttf` | 日本語の既定フォント。**`SystemFont` は使わない**（Web 書き出しに OS のフォントは無く、日本語が消える）。[docs/godot-conventions.md](docs/godot-conventions.md) の「フォント（日本語）」 |
 | stretch | `canvas_items` / `expand` | 基準ビューポートに対して UI を組む。ウィンドウサイズからピクセル位置を計算しない |
 | 3D physics | Jolt Physics | **2D には効かない。** このゲームは 2D なので実質未使用 |
 | renderer | Forward+ / D3D12(Windows) | シェーダは Forward+ 互換で書く |

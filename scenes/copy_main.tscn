@@ -4,13 +4,13 @@
 [ext_resource type="PackedScene" path="res://actors/rocket/rocket.tscn" id="2_rocket"]
 [ext_resource type="PackedScene" path="res://scenes/background.tscn" id="3_background"]
 [ext_resource type="Script" uid="uid://gs6cuka74wjc" path="res://scenes/launch_pad.gd" id="4_launch_pad"]
+[ext_resource type="FontFile" uid="uid://u1qap7mktt0w" path="res://assets/fonts/NotoSansJP-Regular.ttf" id="5_font_jp"]
 
 [sub_resource type="CircleShape2D" id="Shape_catch"]
 radius = 34.0
 
-[sub_resource type="SystemFont" id="Font_ui"]
-font_names = PackedStringArray("Yu Gothic UI", "Meiryo UI", "MS UI Gothic", "Segoe UI")
-subpixel_positioning = 0
+[sub_resource type="FontVariation" id="Font_ui"]
+base_font = ExtResource("5_font_jp")
 
 [node name="Main" type="Node2D" unique_id=31850725]
 script = ExtResource("1_main")

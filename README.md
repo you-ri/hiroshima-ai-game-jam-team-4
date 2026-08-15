@@ -47,6 +47,18 @@ Godot の GUI ビルドは PowerShell から出力を捕捉できないため、
 | [docs/team-rules.md](docs/team-rules.md) | 分担・ブランチ運用・コンフリクト回避 |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | 症状から引く対処表 |
 
+## ライセンス / クレジット
+
+同梱フォント **Noto Sans JP**（[assets/fonts/NotoSansJP-Regular.ttf](assets/fonts/NotoSansJP-Regular.ttf)）
+
+- Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'
+- [SIL Open Font License 1.1](assets/fonts/NotoSansJP-OFL.txt)（全文を同梱。書き出したビルドにも含めている）
+- 容量削減のため JIS 第一水準までにサブセットした改変版。生成手順は [tools/make_jp_font.py](tools/make_jp_font.py)
+- 予約名は `'Source'` なので、この改変版が `Noto Sans JP` を名乗るのは OFL の条件を満たす
+
+OFL は再配布・改変・ゲームへの埋め込みを許可している（禁止されるのはフォント単体の販売）。
+**フォントを差し替えるときはライセンスを確認し、`assets/fonts/` にライセンス全文を置いてここに追記すること。**
+
 ## 開発の原則
 
 1. **「読み込めた」を「動いた」と混同しない。** Godot は壊れたシーンを黙って読み込む。`check` の先の `verify` まで回す。
