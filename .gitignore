@@ -5,6 +5,12 @@
 # ローカル環境固有（メンバーごとに Godot の置き場所が違う / docs/setup.md）
 /.godot-path
 
+# 書き出し成果物（export_presets.cfg の出力先）。生成物なのでコミットしない。
+# .gdignore だけ残す（Godot にこのフォルダを走査させないため。無いと書き出した
+# アイコン PNG がプロジェクトの資産として再インポートされ、次のビルドに巻き込まれる）
+/Packege/*
+!/Packege/.gdignore
+
 # エディタが保存中に作る一時ファイル（*.tscn1234567890.tmp）。残っても中身は不要
 *.tscn*.tmp
 

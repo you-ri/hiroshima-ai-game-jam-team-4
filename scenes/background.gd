@@ -136,9 +136,10 @@ const ESCAPE_BODY_COLOR := Color(0.72, 0.75, 0.84, 1)
 ## 接触判定は持たず、時間経過で一人ずつ順々に焼かれていく
 ## （降り注ぐ流星に世界が焼かれていく画）。残機・スコア等のゲームプレイには一切影響しない
 const CROWD_SEED := 4444
-const CROWD_COUNT := 100
-## 出現位置と、集まって立ち止まる位置（発射台の縁）の x 距離範囲
-const CROWD_SPAWN_X := Vector2(170.0, 640.0)
+const CROWD_COUNT := 30
+## 出現位置と、集まって立ち止まる位置（発射台の縁）の x 距離範囲。
+## 出現は画面外（壁の向こう）まで広く散らし、遠くから順々に駆け寄ってくる画にする
+const CROWD_SPAWN_X := Vector2(120.0, 1200.0)
 const CROWD_STOP_X := Vector2(112.0, 240.0)
 const CROWD_SPEED := Vector2(30.0, 85.0)
 ## 発火が始まる時刻（秒。開始直後から）と、全員に行き渡るまでの幅（秒）
